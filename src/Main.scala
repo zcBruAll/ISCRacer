@@ -1,3 +1,5 @@
+import game.Motor
+
 object Main extends App {
-  println("Hello World")
+  new Motor()
 }
