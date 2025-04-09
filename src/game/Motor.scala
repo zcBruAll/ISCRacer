@@ -1,14 +1,16 @@
 package game
 
+import ch.hevs.gdx2d.components.bitmaps.BitmapImage
 import ch.hevs.gdx2d.desktop.PortableApplication
 import ch.hevs.gdx2d.lib.GdxGraphics
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.glutils.ShaderProgram
 import com.badlogic.gdx.graphics.{Color, Pixmap, Texture}
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 
-class Motor extends PortableApplication(1920, 1080, false) {
+class Motor extends PortableApplication(1920, 1080, true) {
   /**
    * The main Scene2D stage for rendering UI elements.
    */
@@ -19,10 +21,21 @@ class Motor extends PortableApplication(1920, 1080, false) {
    */
   private var skin: Skin = _
 
-  /**
-   * Pixmap of the terrain to render in mode7
-   */
-  private var terrainPixmap: Pixmap = _
+  // Camera position on the terrain map
+  private var camX = 384f
+  private var camY = 384f
+
+  // Simulates the camera height above the ground — larger means seeing further
+  var scale = 50f
+
+  // Field of view — controls how wide the perspective fans out
+  val fov = 1.2f
+
+  // Camera direction in radians — 0 means facing right (+X axis)
+  var angle: Float = math.Pi.toFloat / 2f
+
+  private var mode7Renderer: Mode7Renderer = _
+  private var mapTexture: Texture = _
 
   override def onInit(): Unit = {
     stage = new Stage(new ScreenViewport())
@@ -33,7 +46,9 @@ class Motor extends PortableApplication(1920, 1080, false) {
 
     skin = new Skin(Gdx.files.internal("assets/ui/uiskin.json"))
 
-    terrainPixmap = new Pixmap(Gdx.files.internal("assets/game/map/circuit/example_map.png"))
+    // terrainPixmap = new Pixmap(Gdx.files.internal("assets/game/map/circuit/example_map.png"))
+    mapTexture = new Texture(Gdx.files.internal("assets/game/map/circuit/example_map.png"))
+    mode7Renderer = new Mode7Renderer(mapTexture)
 
     stage.clear()
   }
@@ -44,62 +59,21 @@ class Motor extends PortableApplication(1920, 1080, false) {
     val screenWidth = Gdx.graphics.getWidth
     val screenHeight = Gdx.graphics.getHeight
 
-    // Simulates the camera height above the ground — larger means seeing further
-    val scale = 20000f
+    camX += .5f
+    camY += .5f
 
-    // Field of view — controls how wide the perspective fans out
-    val fov = 1.2f
-
-    // Camera position on the terrain map
-    val cameraX = 384f
-    val cameraY = 384f
-
-    // Camera direction in radians — 0 means facing right (+X axis)
-    val angle = math.Pi / 2
-    val cos = math.cos(angle).toFloat
-    val sin = math.sin(angle).toFloat
+    angle += .1f / 90
 
     // Vertical position of the horizon on screen (in pixels)
-    val horizon = screenHeight / 6
+    val horizon = screenHeight / 3
 
     // Fills the top of the screen with sky color (from top to horizon)
     g.setColor(Color.SKY)
     g.drawFilledRectangle(screenWidth / 2, screenHeight - (horizon / 2), screenWidth, horizon, 0)
 
-    // Render the ground from bottom of screen to the horizon line
-    for (y <- screenHeight - 1 to horizon by -2) {
-      // Row index relative to bottom of screen — used to simulate distance
-      val row = screenHeight - y
+    mode7Renderer.render(camX, camY, angle, scale, fov, horizon)
 
-      // Perspective trick: as row increases, we’re looking further away
-      val rowDistance = scale / row
-
-      // Forward vector for the current row
-      val dx = cos * rowDistance
-      val dy = sin * rowDistance
-
-      for (x <- 0 until screenWidth by 2) {
-        // Maps screen X (left to right) into a range of [-fov, +fov]
-        val lateralOffset = (x - screenWidth / 2).toFloat / (screenWidth / 2) * fov
-
-        // Project screen pixel into world space:
-        // - Move forward along viewing angle (dx/dy)
-        // - Move sideways based on FOV and row distance
-        val sampleX = cameraX + dx - sin * lateralOffset * rowDistance
-        val sampleY = cameraY + dy + cos * lateralOffset * rowDistance
-
-        // Wrap map coordinates to stay inside image bounds
-        val wrappedX = ((sampleX % terrainPixmap.getWidth + terrainPixmap.getWidth) % terrainPixmap.getWidth).toInt
-        val wrappedY = ((sampleY % terrainPixmap.getHeight + terrainPixmap.getHeight) % terrainPixmap.getHeight).toInt
-
-        // Fetch color from the map image
-        val color = new Color(terrainPixmap.getPixel(wrappedX, wrappedY))
-
-        // Draw pixel-sized rectangle at screen position
-        g.setColor(color)
-        g.drawRectangle(x, y - horizon, 1, 2, 0)
-      }
-    }
+    g.drawFPS()
 
     // Update and render UI
     stage.act()
@@ -113,5 +87,7 @@ class Motor extends PortableApplication(1920, 1080, false) {
     super.onDispose()
     stage.dispose()
     skin.dispose()
+    mode7Renderer.dispose()
+    mapTexture.dispose()
   }
 }

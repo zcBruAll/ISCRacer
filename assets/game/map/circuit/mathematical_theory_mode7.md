@@ -64,7 +64,7 @@ That's why we use:
 ```
 So the total lateral vector becomes:
 ```scala
-(-sin  * lateralOffset * rowDistance, +cos * lateralOffset * rowDistance)
+(-sin * lateralOffset * rowDistance, + cos * lateralOffset * rowDistance)
 ```
 ---
 ### Final sampleX/SampleY formula
