@@ -1,5 +1,7 @@
+import ch.hevs.gdx2d.desktop.PortableApplication
 import game.Motor
 
 object Main extends App {
-  new Motor()
+  PortableApplication.CreateLwjglApplication = false
+  new Motor(1920, 1080, true)
 }
