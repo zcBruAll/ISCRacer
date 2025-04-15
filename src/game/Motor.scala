@@ -37,10 +37,10 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
   private var camY = 1467f
 
   // Simulates the camera height above the ground — larger means seeing further
-  var scale = 3f
+  var scale = 1f
 
   // Field of view — controls how wide the perspective fans out
-  val fov = 1.2f
+  var fov = 1.2f
 
   // Camera direction in radians — 0 means facing right (+X axis)
   var angle: Float = math.Pi.toFloat / 2f
@@ -81,8 +81,14 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     g.setColor(Color.SKY)
     g.drawFilledRectangle(width / 2, height - (horizon / 2), width, horizon, 0)
 
-    if (forward || backward)
-      kart.accelerate(forward)
+    if (forward)
+      kart.accelerate()
+    else if (backward && kart.speed > 0)
+      kart.brake()
+    else if (backward)
+      kart.accelerate(false)
+    else
+      kart.applyFriction()
 
     if (drift && (left || right))
       kart.drift(right)
@@ -90,6 +96,8 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
       kart.rotate(right)
 
     kart.move()
+
+    fov = 1.2f + .08f * kart.speed
 
     mode7Renderer.render(kart.x, kart.y, kart.angle, scale, fov, horizon)
 
