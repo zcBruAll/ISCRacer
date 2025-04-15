@@ -1,9 +1,11 @@
 package game
 
+import ch.hevs.gdx2d.components.bitmaps.BitmapImage
+
 class Kart(fps: Int) {
   private var _speed: Float = 0
-  private val maxSpeed: Float = 2.5f
-  private val minSpeed: Float = -.5f
+  val maxSpeed: Float = 2.5f
+  val minSpeed: Float = -.5f
 
   private val accelerationRate: Float = 1.5f
   private val friction: Float = .5f
@@ -14,7 +16,19 @@ class Kart(fps: Int) {
   private var _angle: Float = math.Pi.toFloat / 2
 
   private var _movingAngle: Float = angle
-  private val traction: Float = .1f       // 0 = very slippery, 1 = sharp control
+  private val traction: Float = .02f
+
+  private var isDrifting: Boolean = false
+  private var driftTimer: Float = 0f
+  private val driftBoostThreshold: Float = 1.5f
+  private val driftBoostPower: Float = 1.2f
+  private val driftBoostDuration: Float = 0.8f
+  private var boostTimer: Float = 0f
+
+  private var camDx: Float = 0f
+  private var camDy: Float = 0f
+
+  val texture: BitmapImage = new BitmapImage("assets/game/karts/example_kart/example_kart.png")
 
   def x: Float = _x
 
@@ -53,6 +67,22 @@ class Kart(fps: Int) {
     a
   }
 
+  def update(): Unit = {
+    if (!isDrifting && driftTimer >= driftBoostThreshold) {
+      boostTimer = driftBoostDuration
+    }
+
+    if (boostTimer > 0) {
+      speed += driftBoostPower * (1f / fps)
+      boostTimer -= 1f / fps
+    }
+
+    if (!isDrifting)
+      driftTimer = 0f
+
+    isDrifting = false
+  }
+
   def move(): Unit = {
     val angleDiff = normalizeAngle(angle - movingAngle)
     movingAngle += angleDiff * traction
@@ -86,7 +116,26 @@ class Kart(fps: Int) {
   }
 
   def drift (right: Boolean): Unit = {
+    isDrifting = true
+    driftTimer += 1f / fps
     angle += (if (right) 1 else -1) * .8f / 180
     speed *= .99f
+  }
+
+  def cameraOffset(): (Float, Float) = {
+    val baseDistance = 20f
+    val speedFactor = speed / maxSpeed
+
+    val backward = -baseDistance * speedFactor
+
+    val targetDx = math.cos(angle).toFloat * backward
+    val targetDy = math.sin(angle).toFloat * backward
+
+    val lerpFactor = .1f
+
+    camDx += (targetDx - camDx) * lerpFactor
+    camDy += (targetDy - camDy) * lerpFactor
+
+    (targetDx, targetDy)
   }
 }

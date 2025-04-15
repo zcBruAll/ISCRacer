@@ -32,12 +32,8 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
   // The skin used to style the UI components
   private var skin: Skin = _
 
-  // Camera position on the terrain map
-  private var camX = 3386f
-  private var camY = 1467f
-
   // Simulates the camera height above the ground — larger means seeing further
-  var scale = 1f
+  var scale = 3f
 
   // Field of view — controls how wide the perspective fans out
   var fov = 1.2f
@@ -52,6 +48,8 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
   private var mapTexture: Texture = _
 
   private var kart: Kart = _
+  private var camera: Camera = _
+
   private var forward: Boolean = false
   private var backward: Boolean = false
   private var left: Boolean = false
@@ -69,7 +67,9 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     mapTexture = new Texture(Gdx.files.internal("assets/game/map/tracks/basic_track.png"))
     mode7Renderer = new Mode7Renderer(mapTexture)
 
-    kart = new Kart(gd.getDisplayMode.getRefreshRate)
+    val fps = gd.getDisplayMode.getRefreshRate
+    kart = new Kart(fps)
+    camera = new Camera(fps)
 
     stage.clear()
   }
@@ -95,16 +95,24 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     else if (left || right)
       kart.rotate(right)
 
+    kart.update()
     kart.move()
 
-    fov = 1.2f + .08f * kart.speed
+    camera.update(kart)
 
-    mode7Renderer.render(kart.x, kart.y, kart.angle, scale, fov, horizon)
+    mode7Renderer.render(camera.x + camera.offsetX, camera.y + camera.offsetY, camera.angle, camera.scale, camera.fov, horizon)
+
+    g.drawTransformedPicture(width / 2, height / 4, 0, 3, kart.texture)
 
     g.drawString(10, 100, "Speed: " + kart.speed.toString)
     g.drawString(10, 120, "X: " + kart.x.toString)
     g.drawString(10, 140, "Y: " + kart.y.toString)
     g.drawString(10, 160, "Angle: " + kart.angle.toString)
+
+    g.drawString(10, 200, "X: " + camera.x.toString)
+    g.drawString(10, 220, "Y: " + camera.y.toString)
+    g.drawString(10, 240, "Angle: " + camera.angle.toString)
+
     g.drawFPS()
 
     // Update and render UI
