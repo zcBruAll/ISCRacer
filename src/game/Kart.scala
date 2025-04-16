@@ -16,7 +16,7 @@ class Kart(fps: Int) {
   private var _angle: Float = math.Pi.toFloat / 2
 
   private var _movingAngle: Float = angle
-  private val traction: Float = .02f
+  private val traction: Float = .2f
 
   private var isDrifting: Boolean = false
   private var driftTimer: Float = 0f
@@ -33,13 +33,13 @@ class Kart(fps: Int) {
   def x: Float = _x
 
   def x_= (value: Float): Unit = {
-    _x = value % 4096
+    _x = if (value < 0) 4096 + value else value % 4096
   }
 
   def y: Float = _y
 
   def y_= (value: Float): Unit = {
-    _y = value % 4096
+    _y = if (value < 0) 4096 + value else value % 4096
   }
 
   def angle: Float = _angle

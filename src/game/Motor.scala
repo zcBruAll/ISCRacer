@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.{Color, Texture}
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.utils.viewport.ScreenViewport
+import utils.GraphicsUtils
 
 import java.awt.{GraphicsDevice, GraphicsEnvironment}
 
@@ -113,7 +114,7 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     g.drawString(10, 220, "Y: " + camera.y.toString)
     g.drawString(10, 240, "Angle: " + camera.angle.toString)
 
-    g.drawFPS()
+    GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
 
     // Update and render UI
     stage.act()
