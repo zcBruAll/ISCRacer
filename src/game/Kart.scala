@@ -2,7 +2,9 @@ package game
 
 import ch.hevs.gdx2d.components.bitmaps.BitmapImage
 
-class Kart(fps: Int) {
+class Kart {
+  private var _fps: Int = 0
+
   private var _speed: Float = 0
   val maxSpeed: Float = 2f
   val minSpeed: Float = -.5f
@@ -11,8 +13,8 @@ class Kart(fps: Int) {
   private val friction: Float = .5f
   private val brakeForce: Float = 2.5f
 
-  private var _x: Float = 785f
-  private var _y: Float = 805f
+  private var _x: Float = 0
+  private var _y: Float = 0
   private var _angle: Float = math.Pi.toFloat / 2
 
   private var _movingAngle: Float = angle
@@ -26,6 +28,12 @@ class Kart(fps: Int) {
   private var boostTimer: Float = 0f
 
   val texture: BitmapImage = new BitmapImage("assets/game/karts/example_kart/example_kart.png")
+
+  def fps: Int = _fps
+
+  def fps_=(value: Int): Unit = {
+    _fps = value
+  }
 
   def x: Float = _x
 
@@ -117,5 +125,9 @@ class Kart(fps: Int) {
     driftTimer += 1f / fps
     angle += (if (right) 1 else -1) * .8f / 180
     speed *= .99f
+  }
+
+  def dispose(): Unit = {
+    texture.dispose()
   }
 }

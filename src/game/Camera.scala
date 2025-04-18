@@ -1,6 +1,6 @@
 package game
 
-class Camera(fps: Int) {
+class Camera() {
   private var _x: Float = 0f
   private var _y: Float = 0f
   private var _angle: Float = 0f

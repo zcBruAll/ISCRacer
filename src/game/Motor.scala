@@ -46,10 +46,10 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
   val horizon: Int = height / 3
 
   private var mode7Renderer: Mode7Renderer = _
-  private var mapTexture: Texture = _
 
   private var kart: Kart = _
   private var camera: Camera = _
+  private var track: Track = _
 
   private var forward: Boolean = false
   private var backward: Boolean = false
@@ -64,13 +64,11 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
 
     skin = new Skin(Gdx.files.internal("assets/ui/uiskin.json"))
 
-    // terrainPixmap = new Pixmap(Gdx.files.internal("assets/game/map/circuit/example_map.png"))
-    mapTexture = new Texture(Gdx.files.internal("assets/game/map/tracks/map_1/map_1.png"))
-    mode7Renderer = new Mode7Renderer(mapTexture)
+    track = new Track("map_1")
+    initKart()
+    camera = new Camera()
 
-    val fps = gd.getDisplayMode.getRefreshRate
-    kart = new Kart(fps)
-    camera = new Camera(fps)
+    mode7Renderer = new Mode7Renderer(track.mapTexture)
 
     stage.clear()
   }
@@ -101,24 +99,43 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
 
     camera.update(kart)
 
+    val segmentInfo = track.closestSegmentAndProgress(kart.x, kart.y)
+
     mode7Renderer.render(camera.x + camera.offsetX, camera.y + camera.offsetY, camera.angle, camera.scale, camera.fov, horizon)
 
     g.drawTransformedPicture(width / 2, height / 4, 0, 3, kart.texture)
 
-    g.drawString(10, 100, "Speed: " + kart.speed.toString)
-    g.drawString(10, 120, "X: " + kart.x.toString)
-    g.drawString(10, 140, "Y: " + kart.y.toString)
-    g.drawString(10, 160, "Angle: " + kart.angle.toString)
+    g.drawString(10, 20, "Segment: " + segmentInfo._1)
+    g.drawString(10, 40, "SegDist: " + segmentInfo._2)
+    g.drawString(10, 60, "TotDist: " + segmentInfo._3)
+    g.drawString(10, 80, "DistPer: " + segmentInfo._4)
 
-    g.drawString(10, 200, "X: " + camera.x.toString)
-    g.drawString(10, 220, "Y: " + camera.y.toString)
-    g.drawString(10, 240, "Angle: " + camera.angle.toString)
+    g.drawString(10, 120, "Speed: " + kart.speed.toString)
+    g.drawString(10, 140, "X: " + kart.x.toString)
+    g.drawString(10, 160, "Y: " + kart.y.toString)
+    g.drawString(10, 180, "Angle: " + kart.angle.toString)
+
+    g.drawString(10, 220, "X: " + camera.x.toString)
+    g.drawString(10, 240, "Y: " + camera.y.toString)
+    g.drawString(10, 260, "Angle: " + camera.angle.toString)
 
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
 
     // Update and render UI
     stage.act()
     stage.draw()
+  }
+
+  private def initKart(): Unit = {
+    kart = new Kart()
+    kart.fps = gd.getDisplayMode.getRefreshRate
+    if (track.checkpoints.nonEmpty) {
+      val c0 = track.checkpoints.head
+      val c1 = track.checkpoints(1)
+      kart.x = c0.x
+      kart.y = c0.y
+      kart.angle = math.tan((c1.y - c0.y) / (c1.x - c0.x)).toFloat
+    }
   }
 
   private def createLwjglApplication(): Unit = {
@@ -173,6 +190,7 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     stage.dispose()
     skin.dispose()
     mode7Renderer.dispose()
-    mapTexture.dispose()
+    kart.dispose()
+    track.dispose()
   }
 }
