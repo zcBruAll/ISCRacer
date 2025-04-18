@@ -50,6 +50,7 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
   private var kart: Kart = _
   private var camera: Camera = _
   private var track: Track = _
+  private var playerCheckpointTracker: PlayerCheckpointTracker = _
 
   private var forward: Boolean = false
   private var backward: Boolean = false
@@ -67,6 +68,7 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     track = new Track("map_1")
     initKart()
     camera = new Camera()
+    playerCheckpointTracker = new PlayerCheckpointTracker(track)
 
     mode7Renderer = new Mode7Renderer(track.mapTexture)
 
@@ -97,27 +99,30 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     kart.update()
     kart.move()
 
-    camera.update(kart)
-
     val segmentInfo = track.closestSegmentAndProgress(kart.x, kart.y)
+
+    playerCheckpointTracker.update(segmentInfo._1, kart)
+
+    camera.update(kart)
 
     mode7Renderer.render(camera.x + camera.offsetX, camera.y + camera.offsetY, camera.angle, camera.scale, camera.fov, horizon)
 
     g.drawTransformedPicture(width / 2, height / 4, 0, 3, kart.texture)
 
-    g.drawString(10, 20, "Segment: " + segmentInfo._1)
-    g.drawString(10, 40, "SegDist: " + segmentInfo._2)
-    g.drawString(10, 60, "TotDist: " + segmentInfo._3)
-    g.drawString(10, 80, "DistPer: " + segmentInfo._4)
+    g.drawString(10, 20, "Laps: " + playerCheckpointTracker.lapsCompleted)
+    g.drawString(10, 40, "Segment: " + segmentInfo._1)
+    g.drawString(10, 60, "SegDist: " + segmentInfo._2)
+    g.drawString(10, 80, "TotDist: " + segmentInfo._3)
+    g.drawString(10, 100, "DistPer: " + segmentInfo._4)
 
-    g.drawString(10, 120, "Speed: " + kart.speed.toString)
-    g.drawString(10, 140, "X: " + kart.x.toString)
-    g.drawString(10, 160, "Y: " + kart.y.toString)
-    g.drawString(10, 180, "Angle: " + kart.angle.toString)
+    g.drawString(10, 220, "Speed: " + kart.speed.toString)
+    g.drawString(10, 240, "X: " + kart.x.toString)
+    g.drawString(10, 260, "Y: " + kart.y.toString)
+    g.drawString(10, 280, "Angle: " + kart.angle.toString)
 
-    g.drawString(10, 220, "X: " + camera.x.toString)
-    g.drawString(10, 240, "Y: " + camera.y.toString)
-    g.drawString(10, 260, "Angle: " + camera.angle.toString)
+    g.drawString(10, 320, "X: " + camera.x.toString)
+    g.drawString(10, 340, "Y: " + camera.y.toString)
+    g.drawString(10, 360, "Angle: " + camera.angle.toString)
 
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
 
