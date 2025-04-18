@@ -4,15 +4,15 @@ import ch.hevs.gdx2d.components.bitmaps.BitmapImage
 
 class Kart(fps: Int) {
   private var _speed: Float = 0
-  val maxSpeed: Float = 2.5f
+  val maxSpeed: Float = 2f
   val minSpeed: Float = -.5f
 
   private val accelerationRate: Float = 1.5f
   private val friction: Float = .5f
   private val brakeForce: Float = 2.5f
 
-  private var _x: Float = 3386f
-  private var _y: Float = 1467f
+  private var _x: Float = 785f
+  private var _y: Float = 805f
   private var _angle: Float = math.Pi.toFloat / 2
 
   private var _movingAngle: Float = angle
@@ -24,9 +24,6 @@ class Kart(fps: Int) {
   private val driftBoostPower: Float = 1.2f
   private val driftBoostDuration: Float = 0.8f
   private var boostTimer: Float = 0f
-
-  private var camDx: Float = 0f
-  private var camDy: Float = 0f
 
   val texture: BitmapImage = new BitmapImage("assets/game/karts/example_kart/example_kart.png")
 
@@ -120,22 +117,5 @@ class Kart(fps: Int) {
     driftTimer += 1f / fps
     angle += (if (right) 1 else -1) * .8f / 180
     speed *= .99f
-  }
-
-  def cameraOffset(): (Float, Float) = {
-    val baseDistance = 20f
-    val speedFactor = speed / maxSpeed
-
-    val backward = -baseDistance * speedFactor
-
-    val targetDx = math.cos(angle).toFloat * backward
-    val targetDy = math.sin(angle).toFloat * backward
-
-    val lerpFactor = .1f
-
-    camDx += (targetDx - camDx) * lerpFactor
-    camDy += (targetDy - camDy) * lerpFactor
-
-    (targetDx, targetDy)
   }
 }

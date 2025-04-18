@@ -65,7 +65,7 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     skin = new Skin(Gdx.files.internal("assets/ui/uiskin.json"))
 
     // terrainPixmap = new Pixmap(Gdx.files.internal("assets/game/map/circuit/example_map.png"))
-    mapTexture = new Texture(Gdx.files.internal("assets/game/map/tracks/basic_track.png"))
+    mapTexture = new Texture(Gdx.files.internal("assets/game/map/tracks/map_1/map_1.png"))
     mode7Renderer = new Mode7Renderer(mapTexture)
 
     val fps = gd.getDisplayMode.getRefreshRate
