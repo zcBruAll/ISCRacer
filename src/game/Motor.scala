@@ -74,7 +74,7 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
 
     skin = new Skin(Gdx.files.internal("assets/ui/uiskin.json"))
 
-    track = new Track("map_1")
+    track = new Track("minecraft")
     initKart()
     camera = new Camera()
     player = new Player(track)
