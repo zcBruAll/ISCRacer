@@ -1,54 +1,15 @@
 package game
 
-import ch.hevs.gdx2d.desktop.{Game2D, GdxConfig, PortableApplication}
 import ch.hevs.gdx2d.lib.GdxGraphics
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input.Keys
-import com.badlogic.gdx.backends.lwjgl.{LwjglApplication, LwjglApplicationConfiguration}
-import com.badlogic.gdx.files.FileHandle
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
-import com.badlogic.gdx.graphics.{Color, Texture}
-import com.badlogic.gdx.scenes.scene2d.Stage
-import com.badlogic.gdx.scenes.scene2d.ui.Skin
-import com.badlogic.gdx.utils.Align
-import com.badlogic.gdx.utils.viewport.ScreenViewport
+import com.badlogic.gdx.graphics.Color
+import menu.Menu
 import utils.GraphicsUtils
 
-import java.awt.{GraphicsDevice, GraphicsEnvironment}
-
-class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends PortableApplication(width, height, fullScreen) {
-
-  // Graphic device used by the application
-  private val gd: GraphicsDevice = GraphicsEnvironment.getLocalGraphicsEnvironment.getDefaultScreenDevice
-
-  if (fullScreen) {
-    width = gd.getDisplayMode.getWidth
-    height = gd.getDisplayMode.getHeight
-  }
-
-  // Lwjgl application configuration
-  private val config: LwjglApplicationConfiguration = GdxConfig.getLwjglConfig(width, height, fullScreen)
-  createLwjglApplication()
-
-  // The main Scene2D stage for rendering UI elements.
-  private var stage: Stage = _
-
-  // The skin used to style the UI components
-  private var skin: Skin = _
-
-  // Simulates the camera height above the ground — larger means seeing further
-  var scale = 3f
-
-  // Field of view — controls how wide the perspective fans out
-  var fov = 1.2f
-
-  // Camera direction in radians — 0 means facing right (+X axis)
-  var angle: Float = math.Pi.toFloat / 2f
-
-  // Vertical position of the horizon on screen (in pixels)
-  val horizon: Int = height / 3
-
+object Motor {
   private var mode7Renderer: Mode7Renderer = _
 
   private var kart: Kart = _
@@ -67,14 +28,16 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
   private var totalTimeFont: BitmapFont = _
   private var lapTimeFont: BitmapFont = _
 
-  override def onInit(): Unit = {
-    stage = new Stage(new ScreenViewport())
+  private val menu: Menu = Menu.menu
 
-    Gdx.graphics.setResizable(false)
+  private val width: Int = menu.width
+  private val height: Int = menu.height
+  private val horizon: Int = height / 3
 
-    skin = new Skin(Gdx.files.internal("assets/ui/uiskin.json"))
+  private var initiated: Boolean = false
 
-    track = new Track("minecraft")
+  def init(map: String): Unit = {
+    track = new Track(map)
     initKart()
     camera = new Camera()
     player = new Player(track)
@@ -83,11 +46,10 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
 
     initFonts()
 
-    stage.clear()
+    initiated = true
   }
 
-  override def onGraphicRender(g: GdxGraphics): Unit = {
-
+  def render(g: GdxGraphics): Unit = {
     g.clear()
 
     // Fills the top of the screen with sky color (from top to horizon)
@@ -126,15 +88,11 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
 
     if (debug) displayDebug(g, segmentInfo)
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
-
-    // Update and render UI
-    stage.act()
-    stage.draw()
   }
 
   private def initKart(): Unit = {
     kart = new Kart()
-    kart.fps = gd.getDisplayMode.getRefreshRate
+    kart.fps = menu.gd.getDisplayMode.getRefreshRate
     if (track.checkpoints.nonEmpty) {
       val c0 = track.checkpoints.head
       val c1 = track.checkpoints(1)
@@ -144,9 +102,8 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     }
   }
 
-  override def onKeyDown(keycode: Int): Unit = {
-    super.onKeyDown(keycode)
-
+  def onKeyDown(keycode: Int): Unit = {
+    if (!initiated) return
     keycode match {
       case Keys.W => forward = true
       case Keys.S => backward = true
@@ -158,9 +115,8 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     }
   }
 
-  override def onKeyUp(keycode: Int): Unit = {
-    super.onKeyUp(keycode)
-
+  def onKeyUp(keycode: Int): Unit = {
+    if (!initiated) return
     keycode match {
       case Keys.W => forward = false
       case Keys.S => backward = false
@@ -208,33 +164,13 @@ class Motor(var width: Int, var height: Int, fullScreen: Boolean) extends Portab
     g.drawString(10, 420, "Last Lap: " + player.lastLap)
   }
 
-  private def createLwjglApplication(): Unit = {
-    Thread.currentThread.setPriority(10)
-
-    config.foregroundFPS = gd.getDisplayMode.getRefreshRate
-    config.backgroundFPS = 15
-    config.vSyncEnabled = true
-    config.samples = 4
-    config.depth = 24
-    config.stencil = 8
-    config.useGL30 = true
-    config.gles30ContextMajorVersion = 3
-    config.gles30ContextMinorVersion = 2
-    config.title = "ISCRacer"
-
-    val theGame = new Game2D(this)
-    new LwjglApplication(theGame, config)
-  }
-
   /**
    * Disposes resources on application exit.
    */
-  override def onDispose(): Unit = {
-    super.onDispose()
-    stage.dispose()
-    skin.dispose()
+  def dispose(): Unit = {
     mode7Renderer.dispose()
     kart.dispose()
     track.dispose()
+    initiated = false
   }
 }

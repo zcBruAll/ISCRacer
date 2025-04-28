@@ -1,7 +1,7 @@
 import ch.hevs.gdx2d.desktop.PortableApplication
-import game.Motor
+import menu.Menu
 
 object Main extends App {
   PortableApplication.CreateLwjglApplication = false
-  new Motor(1920, 1080, true)
+  Menu.createMenu()
 }
