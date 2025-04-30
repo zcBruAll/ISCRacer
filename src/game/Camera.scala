@@ -88,7 +88,7 @@ class Camera() {
     angle = kart.angle
 
     val baseDistance = 20f
-    val speedFactor = kart.speed / kart.maxSpeed
+    val speedFactor = kart.speed / (kart.maxSpeed * kart.multiplier)
 
     targetOffsetX = math.cos(angle).toFloat * -baseDistance * speedFactor
     targetOffsetY = math.sin(angle).toFloat * -baseDistance * speedFactor
