@@ -1,6 +1,6 @@
 package game
 
-class Camera(fps: Int) {
+class Camera() {
   private var _x: Float = 0f
   private var _y: Float = 0f
   private var _angle: Float = 0f
@@ -88,7 +88,7 @@ class Camera(fps: Int) {
     angle = kart.angle
 
     val baseDistance = 20f
-    val speedFactor = kart.speed / kart.maxSpeed
+    val speedFactor = kart.speed / (kart.maxSpeed * kart.multiplier)
 
     targetOffsetX = math.cos(angle).toFloat * -baseDistance * speedFactor
     targetOffsetY = math.sin(angle).toFloat * -baseDistance * speedFactor
