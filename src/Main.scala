@@ -3,5 +3,5 @@ import menu.Menu
 
 object Main extends App {
   PortableApplication.CreateLwjglApplication = false
-  Menu.createMenu()
+  Menu.createMenu(fullScreen = false)
 }
