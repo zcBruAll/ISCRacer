@@ -3,10 +3,12 @@ import com.comcast.ip4s.{Host, IpAddress, IpLiteralSyntax, Port, SocketAddress}
 import fs2.io.net.{Datagram, Network}
 import fs2.{Chunk, Stream}
 
+import java.net.InetAddress
 import java.nio.charset.StandardCharsets
 import scala.concurrent.duration.DurationInt
 
-object GameClientApp extends IOApp {
+object ConnectionTests extends IOApp {
+
   def tcpClient(serverHost: Host, serverPort: Port): Stream[IO, Unit] =
     Stream.resource(Network[IO].client(SocketAddress(serverHost, serverPort))).flatMap { socket =>
       socket.reads
@@ -36,15 +38,16 @@ object GameClientApp extends IOApp {
     }
 
   def run(args: List[String]): IO[ExitCode] = {
-    val serverHost = ip"127.0.0.1"
+    val serverHost = host"iscracer.allanbrunner.dev"
+    val serverIp = ip"91.214.191.159"
     val tcpPort = port"9000"
     val udpInputPort = port"5555"
     val udpListenPort = port"6001"  // Change per client
     val playerId = 1  // Change per client
 
     val streams = Stream(
-      tcpClient(serverHost, tcpPort),
-      udpInputSender(serverHost, udpInputPort, playerId),
+      tcpClient(serverIp, tcpPort),
+      udpInputSender(serverIp, udpInputPort, playerId),
       udpStateReceiver(udpListenPort)
     ).parJoinUnbounded
 
