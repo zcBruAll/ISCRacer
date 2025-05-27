@@ -1,9 +1,10 @@
+import cats.effect.kernel.Ref
+import cats.effect.unsafe.implicits.global
 import cats.effect.{ExitCode, IO, IOApp}
 import com.comcast.ip4s.{Host, IpAddress, IpLiteralSyntax, Port, SocketAddress}
-import fs2.io.net.{Datagram, Network}
+import fs2.io.net.{Datagram, Network, Socket}
 import fs2.{Chunk, Stream}
 
-import java.net.InetAddress
 import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -13,15 +14,50 @@ object ConnectionTests extends IOApp {
 
   case class CarState(uuid: UUID, x: Double, y: Double, vx: Double, vy: Double, direction: Double)
 
-  val defaultUUID = UUID.randomUUID()
+  val defaultUUID: UUID = UUID.randomUUID()
+
+  val socketRef: IO[Ref[IO, Option[Socket[IO]]]] = Ref.of[IO, Option[Socket[IO]]](None)
+
+  object MsgType extends Enumeration {
+    val Handshake: Byte = 0x01
+    val ReadyUpdate: Byte = 0x02
+  }
+
+  // Call whenever it will be needed to send a ready packet (working fine)
+  def sendReady(socket: Socket[IO], uuid: UUID, ready: Boolean): IO[Unit] = {
+    val payload = {
+      val dataLength = 1 + 16 + 1
+      val buf = ByteBuffer
+        .allocate(2 + dataLength)
+        .order(ByteOrder.BIG_ENDIAN)
+
+      buf.putShort(dataLength.toShort)
+      buf.put(MsgType.ReadyUpdate)
+      buf.putLong(uuid.getMostSignificantBits)
+      buf.putLong(uuid.getLeastSignificantBits)
+      buf.put(if (ready) 1.toByte else 0.toByte)
+      buf.flip()
+
+      Chunk.byteBuffer(buf)
+    }
+    socket.write(payload).void
+  }
 
   def tcpClient(serverHost: Host, serverPort: Port, uuid: UUID, username: String): Stream[IO, Unit] =
-    Stream.resource(Network[IO].client(SocketAddress(serverHost, serverPort))).flatMap { socket =>
+    Stream.resource(Network[IO].client(SocketAddress(serverHost, serverPort))).evalTap(socket => socketRef.unsafeRunSync().set(Some(socket))).flatMap { socket =>
       // Send uuid and username to the server
       Stream.eval {
-        val message = s"$uuid;$username"
-        IO.println(s"Sending $message") *>
-        socket.write(Chunk.array(message.getBytes(StandardCharsets.UTF_8)))
+        val usernameLength = username.length
+        val dataLength = 1 + 16 + 1 + usernameLength
+        val buf = ByteBuffer.allocate(2 + dataLength).order(ByteOrder.BIG_ENDIAN)
+        buf.putShort(dataLength.toShort)
+        buf.put(MsgType.Handshake)
+        buf.putLong(uuid.getMostSignificantBits)
+        buf.putLong(uuid.getLeastSignificantBits)
+        buf.put(usernameLength.toByte)
+        buf.put(username.getBytes(StandardCharsets.UTF_8))
+        buf.flip()
+        socket.write(Chunk.ByteBuffer(buf))
       } ++
       socket.reads
         .through(fs2.text.utf8.decode)
@@ -46,7 +82,7 @@ object ConnectionTests extends IOApp {
       }
     }
 
-  val recordSize = 16 + 5 * 4
+  val recordSize: Int = 16 + 5 * 4
 
   def decode(bytes: Array[Byte]): Option[Array[CarState]] = {
 
