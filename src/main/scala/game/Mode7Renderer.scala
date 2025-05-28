@@ -17,7 +17,7 @@ class Mode7Renderer(texture: Texture) {
       |}
       |""".stripMargin
 
-  private val fragmentShader: String = Gdx.files.internal("assets/shaders/mode7.frag").readString()
+  private val fragmentShader: String = Gdx.files.internal("src/main/assets/shaders/mode7.frag").readString()
 
   private val shader = new ShaderProgram(vertexShader, fragmentShader)
   if (!shader.isCompiled) throw new Exception("Shader compile error: " + shader.getLog)

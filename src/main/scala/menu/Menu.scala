@@ -40,7 +40,7 @@ class Menu private(var width: Int, var height: Int, fullScreen: Boolean) extends
     val multiplexer = new InputMultiplexer(stage, _lwjglApp.getInput.getInputProcessor)
     Gdx.input.setInputProcessor(multiplexer)
 
-    skin = new Skin(Gdx.files.internal("assets/ui/uiskin.json"))
+    skin = new Skin(Gdx.files.internal("src/main/assets/ui/uiskin.json"))
 
     screenManager = new ScreenManager(stage, skin)
     screenManager.switchTo(MainMenu)
