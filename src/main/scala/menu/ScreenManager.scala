@@ -17,6 +17,7 @@ class ScreenManager(stage: Stage, skin: Skin) {
     currentScreen = state match {
       case MainMenu => new MainMenuScreen()
       case Settings => new SettingsScreen()
+      case Lobby => new LobbyScreen()
       case Game => new GameScreen()
     }
 
