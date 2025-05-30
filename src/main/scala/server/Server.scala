@@ -1,8 +1,5 @@
 package server
 
-import cats.effect
-import cats.effect.kernel.Ref
-import cats.effect.unsafe.implicits.global
 import cats.effect.{ExitCode, IO}
 import com.comcast.ip4s.{Host, IpAddress, IpLiteralSyntax, Port, SocketAddress}
 import fs2.io.net.{Datagram, Network, Socket}
@@ -18,9 +15,11 @@ object Server {
 
   val defaultUUID: UUID = UUID.randomUUID()
 
-  val socketRef: IO[Ref[IO, Option[Socket[IO]]]] = Ref.of[IO, Option[Socket[IO]]](None)
+  //val socketRef: IO[Ref[IO, Option[Socket[IO]]]] = Ref.of[IO, Option[Socket[IO]]](None)
   var socketUnsafe: Option[Socket[IO]] = None
+  var usernameUnsafe = "User" + (100 + math.random() * 100).floor.toInt
   var readyUnsafe = false
+  var lobbyUnsafe: Option[String] = None
 
   object MsgType extends Enumeration {
     val Handshake: Byte = 0x01
@@ -49,7 +48,7 @@ object Server {
   }
 
   def tcpClient(serverHost: Host, serverPort: Port, uuid: UUID, username: String): Stream[IO, Unit] =
-    Stream.resource(Network[IO].client(SocketAddress(serverHost, serverPort))).evalTap(socket => socketRef.unsafeRunSync().set(Some(socket))).flatMap { socket =>
+    Stream.resource(Network[IO].client(SocketAddress(serverHost, serverPort))).flatMap { socket =>
       socketUnsafe = Some(socket)
       // Send uuid and username to the server
       Stream.eval {
@@ -65,10 +64,15 @@ object Server {
         buf.flip()
         socket.write(Chunk.ByteBuffer(buf))
       } ++
-        socket.reads
-          .through(fs2.text.utf8.decode)
-          .evalMap(msg => IO.println(s"[TCP] Lobby update: $msg"))
-          .handleErrorWith(e => Stream.eval(IO.println(s"[TCP] Error: ${e.getMessage}")))
+        Stream.repeatEval {
+          socket.readN(2).map(_.toArray).flatMap { header =>
+            val len = ByteBuffer.wrap(header).order(ByteOrder.BIG_ENDIAN).getShort
+            socket.readN(len).map(_.toArray)
+          }
+        }.evalMap { payload =>
+          lobbyUnsafe = decodeLobbyState(payload)
+          IO.unit
+        }
     }
 
   def udpInputSender(serverHost: IpAddress, serverPort: Port): Stream[IO, Unit] =
@@ -82,7 +86,7 @@ object Server {
         socket.write(datagram)
       }.concurrently {
         socket.reads.evalMap { datagram =>
-          val msg = decode(datagram.bytes.toArray)
+          val msg = decodeCarState(datagram.bytes.toArray)
           IO.println(s"[UDP] Car update received: ${msg.getOrElse(Array.empty[CarState]).mkString(", ")}")
         }
       }
@@ -90,7 +94,7 @@ object Server {
 
   val recordSize: Int = 16 + 5 * 4
 
-  def decode(bytes: Array[Byte]): Option[Array[CarState]] = {
+  def decodeCarState(bytes: Array[Byte]): Option[Array[CarState]] = {
 
     if (bytes.length < 2) return None
 
@@ -121,6 +125,31 @@ object Server {
     } else Some(Array.empty[CarState])
   }
 
+  def decodeLobbyState(bytes: Array[Byte]): Option[String] = {
+    if (bytes.length < 8) return None
+
+    val bb = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
+
+    val nbPlayers = bb.getShort
+    val nbReady = bb.getShort
+    val timeBeforeStart = bb.getInt match {
+      case 99 => "Waiting..."
+      case 0 => "NOW !"
+      case seconds => s"Starts in $seconds"
+    }
+
+    val userlistString = for (_ <- 0 until nbPlayers) yield {
+      val usernameLength = bb.get()
+      val usernameBytes = new Array[Byte](usernameLength)
+      bb.get(usernameBytes)
+      val username = new String(usernameBytes, StandardCharsets.UTF_8)
+      val isReady = bb.get() != 0
+      s"${if (isReady) "READY    " else "NOT READY"} - $username"
+    }
+
+    Some(s"$nbReady/$nbPlayers player${if (nbReady > 1) "s" else ""}\n$timeBeforeStart\n${userlistString.mkString("\n")}")
+  }
+
   def init(username: String, mode: String = "PROD"): IO[ExitCode] = {
     var serverHost = host"iscracer.allanbrunner.dev"
     var serverIp = ip"91.214.191.159"
@@ -130,6 +159,8 @@ object Server {
     }
     val tcpPort = port"9000"
     val udpInputPort = port"5555"
+
+    usernameUnsafe = username
 
     val streams = Stream(
       tcpClient(serverHost, tcpPort, defaultUUID, username),

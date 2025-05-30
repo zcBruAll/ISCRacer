@@ -1,18 +1,19 @@
 package menu.screens
 
-import cats.effect.IO
-import cats.effect.std.Dispatcher
 import cats.effect.unsafe.implicits.global
 import ch.hevs.gdx2d.lib.GdxGraphics
-import com.badlogic.gdx.scenes.scene2d.ui.{Skin, TextButton, TextField}
+import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.scenes.scene2d.ui.{Label, Skin, TextButton, TextField}
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.scenes.scene2d.{Actor, InputEvent, Stage}
+import com.badlogic.gdx.utils.Align
 import menu.{MainMenu, Menu}
 import server.Server
 
 class LobbyScreen extends Screen {
   private var stage: Stage = _
 
+  private var lblLobby: Label = _
   private var txtUsername: TextField = _
   private var btnConnect: TextButton = _
   private var btnBack: TextButton = _
@@ -29,7 +30,13 @@ class LobbyScreen extends Screen {
   override def init(stage: Stage, skin: Skin): Unit = {
     this.stage = stage
 
-    txtUsername = new TextField("User" + (100 + math.random() * 100).toInt, skin)
+    val labelStyle = new Label.LabelStyle(Menu.menu.consolasFont, Color.WHITE)
+    lblLobby = new Label("", labelStyle)
+    lblLobby.setAlignment(Align.left)
+    lblLobby.setSize(300, 500)
+    lblLobby.setPosition(20, centerY(lblLobby))
+
+    txtUsername = new TextField(Server.usernameUnsafe, skin)
     txtUsername.setSize(200, 60)
     txtUsername.setPosition(centerX(txtUsername), centerY(txtUsername) - 40)
     txtUsername.setMaxLength(16)
@@ -42,6 +49,7 @@ class LobbyScreen extends Screen {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
         if (!txtUsername.getText.isBlank) {
           Server.init(txtUsername.getText, "TEST").unsafeRunAndForget()
+          txtUsername.setDisabled(true)
           btnConnect.setVisible(false)
           btnReady.setVisible(true)
         }
@@ -51,16 +59,19 @@ class LobbyScreen extends Screen {
     btnReady = new TextButton("Ready", skin)
     btnReady.setSize(200, 60)
     btnReady.setPosition(centerX(btnReady), centerY(btnReady) + 40)
-
     btnReady.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
         if (Server.socketUnsafe.isDefined) {
           Server.sendReady(Server.socketUnsafe.get, Server.defaultUUID, !Server.readyUnsafe).unsafeRunAndForget()
-          btnReady.setText(if (Server.readyUnsafe) "Ready" else "Not Ready")
         }
       }
     })
     btnReady.setVisible(false)
+
+    if (Server.socketUnsafe.isDefined) {
+      btnConnect.setVisible(false)
+      btnReady.setVisible(true)
+    }
 
     btnBack = new TextButton("Back", skin)
     btnBack.setSize(200, 60)
@@ -76,17 +87,33 @@ class LobbyScreen extends Screen {
     this.stage.addActor(btnConnect)
     this.stage.addActor(btnBack)
     this.stage.addActor(btnReady)
+    this.stage.addActor(lblLobby)
     addedActors ::= txtUsername
     addedActors ::= btnConnect
     addedActors ::= btnBack
     addedActors ::= btnReady
+    addedActors ::= lblLobby
+  }
+
+  def updateBtnReady(): Unit = {
+    var txt = "Ready"
+    var c = Color.LIME
+    if (!Server.readyUnsafe) {
+      txt = "Not Ready"
+      c = Color.SCARLET
+    }
+    btnReady.setText(txt)
+    btnReady.setColor(c)
   }
 
   /**
    * Updates the screen's logic.
    * Called once per frame in the main render loop.
    */
-  override def update(g: GdxGraphics): Unit = {}
+  override def update(g: GdxGraphics): Unit = {
+    lblLobby.setText(Server.lobbyUnsafe.getOrElse("No Lobby"))
+    updateBtnReady()
+  }
 
   /**
    * Disposes of the screen by clearing or removing any added actors or resources.
