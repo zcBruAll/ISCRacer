@@ -17,13 +17,15 @@ object Server {
 
   //val socketRef: IO[Ref[IO, Option[Socket[IO]]]] = Ref.of[IO, Option[Socket[IO]]](None)
   var socketUnsafe: Option[Socket[IO]] = None
-  var usernameUnsafe = "User" + (100 + math.random() * 100).floor.toInt
+  var usernameUnsafe: String = "User" + (100 + math.random() * 100).floor.toInt
   var readyUnsafe = false
-  var lobbyUnsafe: Option[String] = None
+  var lobbyUnsafe: String = "No lobby"
 
   object MsgType extends Enumeration {
     val Handshake: Byte = 0x01
     val ReadyUpdate: Byte = 0x02
+    val LobbyState: Byte = 0x03
+    val GameStart: Byte = 0x04
   }
 
   // Call whenever it will be needed to send a ready packet (working fine)
@@ -70,7 +72,7 @@ object Server {
             socket.readN(len).map(_.toArray)
           }
         }.evalMap { payload =>
-          lobbyUnsafe = decodeLobbyState(payload)
+          decodeTCP(payload)
           IO.unit
         }
     }
@@ -125,29 +127,33 @@ object Server {
     } else Some(Array.empty[CarState])
   }
 
-  def decodeLobbyState(bytes: Array[Byte]): Option[String] = {
-    if (bytes.length < 8) return None
+  def decodeTCP(bytes: Array[Byte]): Unit = {
+    if (bytes.length < 1) return
 
     val bb = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
 
-    val nbPlayers = bb.getShort
-    val nbReady = bb.getShort
-    val timeBeforeStart = bb.getInt match {
-      case 99 => "Waiting..."
-      case 0 => "NOW !"
-      case seconds => s"Starts in $seconds"
-    }
+    bb.get() match {
+      case MsgType.LobbyState =>
+        val nbPlayers = bb.getShort
+        val nbReady = bb.getShort
+        val timeBeforeStart = bb.getShort match {
+          case 99 => "Waiting..."
+          case 0 => "NOW !"
+          case seconds => s"Starts in $seconds"
+        }
 
-    val userlistString = for (_ <- 0 until nbPlayers) yield {
-      val usernameLength = bb.get()
-      val usernameBytes = new Array[Byte](usernameLength)
-      bb.get(usernameBytes)
-      val username = new String(usernameBytes, StandardCharsets.UTF_8)
-      val isReady = bb.get() != 0
-      s"${if (isReady) "READY    " else "NOT READY"} - $username"
-    }
+        val userlistString = for (_ <- 0 until nbPlayers) yield {
+          val usernameLength = bb.get()
+          val usernameBytes = new Array[Byte](usernameLength)
+          bb.get(usernameBytes)
+          val username = new String(usernameBytes, StandardCharsets.UTF_8)
+          val isReady = bb.get() != 0
+          s"${if (isReady) "READY    " else "NOT READY"} - $username"
+        }
 
-    Some(s"$nbReady/$nbPlayers player${if (nbReady > 1) "s" else ""}\n$timeBeforeStart\n${userlistString.mkString("\n")}")
+        lobbyUnsafe = s"$nbReady/$nbPlayers player${if (nbReady > 1) "s" else ""}\n$timeBeforeStart\n${userlistString.mkString("\n")}"
+      case _ => println("Unknown TCP code")
+    }
   }
 
   def init(username: String, mode: String = "PROD"): IO[ExitCode] = {

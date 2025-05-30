@@ -111,7 +111,7 @@ class LobbyScreen extends Screen {
    * Called once per frame in the main render loop.
    */
   override def update(g: GdxGraphics): Unit = {
-    lblLobby.setText(Server.lobbyUnsafe.getOrElse("No Lobby"))
+    lblLobby.setText(Server.lobbyUnsafe)
     updateBtnReady()
   }
 
