@@ -4,6 +4,7 @@ import cats.effect.{ExitCode, IO}
 import com.comcast.ip4s.{Host, IpAddress, IpLiteralSyntax, Port, SocketAddress}
 import fs2.io.net.{Datagram, Network, Socket}
 import fs2.{Chunk, Stream}
+import game.Motor
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
@@ -25,11 +26,12 @@ object Server {
     val Handshake: Byte = 0x01
     val ReadyUpdate: Byte = 0x02
     val LobbyState: Byte = 0x03
-    val GameStart: Byte = 0x04
+    val GameInit: Byte = 0x04
+    val GameStart: Byte = 0x05
   }
 
   // Call whenever it will be needed to send a ready packet (working fine)
-  def sendReady(socket: Socket[IO], uuid: UUID, isReady: Boolean): IO[Unit] = {
+  def sendReady(socket: Socket[IO], uuid: UUID, isReady: Boolean, readyMode: Byte): IO[Unit] = {
     val payload = {
       val dataLength = 1 + 16 + 1
       val buf = ByteBuffer
@@ -37,7 +39,7 @@ object Server {
         .order(ByteOrder.BIG_ENDIAN)
 
       buf.putShort(dataLength.toShort)
-      buf.put(MsgType.ReadyUpdate)
+      buf.put(readyMode)
       buf.putLong(uuid.getMostSignificantBits)
       buf.putLong(uuid.getLeastSignificantBits)
       buf.put(if (isReady) 1.toByte else 0.toByte)
@@ -152,7 +154,22 @@ object Server {
         }
 
         lobbyUnsafe = s"$nbReady/$nbPlayers player${if (nbReady > 1) "s" else ""}\n$timeBeforeStart\n${userlistString.mkString("\n")}"
-      case _ => println("Unknown TCP code")
+      case MsgType.GameInit =>
+        val mapNameLength = bb.get()
+        val mapBytes = new Array[Byte](mapNameLength)
+        bb.get(mapBytes)
+        val mapName = new String(mapBytes, StandardCharsets.UTF_8)
+
+        val x0 = bb.getShort
+        val y0 = bb.getShort
+        val direction = bb.getFloat
+
+        Motor.gameSettings = (mapName, x0, y0, direction)
+        Motor.startGame = true
+
+        sendReady(socketUnsafe.get, defaultUUID, isReady = true, MsgType.GameStart)
+
+      case code => println(s"Unknown TCP code: $code")
     }
   }
 

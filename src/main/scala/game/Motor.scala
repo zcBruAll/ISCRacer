@@ -34,11 +34,14 @@ object Motor {
   private val height: Int = menu.height
   private val horizon: Int = height / 3
 
+  var startGame: Boolean = false
   private var initiated: Boolean = false
 
-  def init(map: String): Unit = {
+  var gameSettings: (String, Int, Int, Float) = _
+
+  def init(map: String, x0: Int, y0: Int, direction: Float): Unit = {
     track = new Track(map)
-    initKart()
+    initKart(x0, y0, direction)
     camera = new Camera()
     player = new Player(track)
 
@@ -55,7 +58,7 @@ object Motor {
     // Fills the top of the screen with sky color (from top to horizon)
     g.setColor(Color.SKY)
     g.drawFilledRectangle(width / 2, height - (horizon / 2), width, horizon, 0)
-
+/*
     if (forward)
       kart.accelerate()
     else if (backward && kart.speed > 0)
@@ -77,6 +80,8 @@ object Motor {
 
     player.update(segmentInfo._1, kart)
 
+    */
+
     camera.update(kart)
 
     mode7Renderer.render(camera.x + camera.offsetX, camera.y + camera.offsetY, camera.angle, camera.scale, camera.fov, horizon)
@@ -86,20 +91,16 @@ object Motor {
     g.drawStringCentered(150, player.lapTime, lapTimeFont)
     g.drawStringCentered(80, player.totalTime, totalTimeFont)
 
-    if (debug) displayDebug(g, segmentInfo)
+    //if (debug) displayDebug(g, segmentInfo)
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
   }
 
-  private def initKart(): Unit = {
+  private def initKart(x0: Int, y0: Int, direction: Float): Unit = {
     kart = new Kart()
     kart.fps = menu.gd.getDisplayMode.getRefreshRate
-    if (track.checkpoints.nonEmpty) {
-      val c0 = track.checkpoints.head
-      val c1 = track.checkpoints(1)
-      kart.x = c0.x
-      kart.y = c0.y
-      kart.angle = math.tan((c1.y - c0.y) / (c1.x - c0.x)).toFloat
-    }
+    kart.x = x0
+    kart.y = y0
+    kart.angle = direction
   }
 
   def onKeyDown(keycode: Int): Unit = {

@@ -7,7 +7,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.{Label, Skin, TextButton, TextField}
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.scenes.scene2d.{Actor, InputEvent, Stage}
 import com.badlogic.gdx.utils.Align
-import menu.{MainMenu, Menu}
+import game.Motor
+import menu.{Game, MainMenu, Menu}
 import server.Server
 
 class LobbyScreen extends Screen {
@@ -62,7 +63,7 @@ class LobbyScreen extends Screen {
     btnReady.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
         if (Server.socketUnsafe.isDefined) {
-          Server.sendReady(Server.socketUnsafe.get, Server.defaultUUID, !Server.readyUnsafe).unsafeRunAndForget()
+          Server.sendReady(Server.socketUnsafe.get, Server.defaultUUID, !Server.readyUnsafe, Server.MsgType.ReadyUpdate).unsafeRunAndForget()
         }
       }
     })
@@ -111,6 +112,7 @@ class LobbyScreen extends Screen {
    * Called once per frame in the main render loop.
    */
   override def update(g: GdxGraphics): Unit = {
+    if (Motor.startGame) Menu.screenManager.switchTo(Game)
     lblLobby.setText(Server.lobbyUnsafe)
     updateBtnReady()
   }
