@@ -112,7 +112,7 @@ class LobbyScreen extends Screen {
    * Called once per frame in the main render loop.
    */
   override def update(g: GdxGraphics): Unit = {
-    if (Motor.startGame) Menu.screenManager.switchTo(Game)
+    if (Motor.initGame) Menu.screenManager.switchTo(Game)
     lblLobby.setText(Server.lobbyUnsafe)
     updateBtnReady()
   }

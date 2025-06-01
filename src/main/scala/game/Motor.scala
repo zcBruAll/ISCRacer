@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.graphics.Color
 import menu.Menu
+import server.Server
 import utils.GraphicsUtils
 
 case class PlayerInput(forwardKB: Float = 0, backwardKB: Float = 0, steerLeftKB: Float = 0, steerRightKB: Float = 0, driftKB: Boolean = false,
@@ -42,8 +43,10 @@ object Motor {
   private val height: Int = menu.height
   private val horizon: Int = height / 3
 
-  var startGame: Boolean = false
+  var initGame: Boolean = false
   private var initiated: Boolean = false
+  var timer: String = ""
+  var startGame: Boolean = false
 
   var gameSettings: (String, Int, Int, Float) = _
 
@@ -58,6 +61,8 @@ object Motor {
     initFonts()
 
     initiated = true
+
+    Server.sendReady(Server.socketUnsafe.get, Server.defaultUUID, isReady = true, Server.MsgType.GameStart).unsafeRunAndForget()
   }
 
   def render(g: GdxGraphics): Unit = {
@@ -75,6 +80,7 @@ object Motor {
 
     //g.drawStringCentered(150, player.lapTime, lapTimeFont)
     //g.drawStringCentered(80, player.totalTime, totalTimeFont)
+    if (timer != "") g.drawStringCentered(540, timer, lapTimeFont)
 
     // if (debug) displayDebug(g, segmentInfo)
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
@@ -97,8 +103,6 @@ object Motor {
       case Keys.SHIFT_LEFT => inputs.update(p => p.copy(driftKB = true)).unsafeRunSync()
       case _ =>
     }
-
-    println(inputs.get.unsafeRunSync())
   }
 
   def onKeyUp(keycode: Int): Unit = {

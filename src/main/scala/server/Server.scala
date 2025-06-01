@@ -75,6 +75,7 @@ object Server {
             socket.readN(len).map(_.toArray)
           }
         }.evalMap { payload =>
+          println("Received a message of length:" + payload.length)
           decodeTCP(payload)
           IO.unit
         }
@@ -98,9 +99,12 @@ object Server {
         IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
       }.concurrently {
           Stream.awakeEvery[IO](33.millis)/*.evalFilter(_ => Motor.startGame)*/.evalMap { _ =>
-            val inputsByte = encodeInputs(Motor.inputs.get.unsafeRunSync())
-            val datagram = Datagram(serverAddr, inputsByte)
-            socket.write(datagram)
+            if (!Motor.startGame) IO.unit
+            else {
+              val inputsByte = encodeInputs(Motor.inputs.get.unsafeRunSync())
+              val datagram = Datagram(serverAddr, inputsByte)
+              socket.write(datagram)
+            }
           }
       }
     }
@@ -174,11 +178,15 @@ object Server {
         val direction = bb.getFloat
 
         Motor.gameSettings = (mapName, x0, y0, direction)
-        Motor.startGame = true
+        Motor.initGame = true
 
-        sendReady(socketUnsafe.get, defaultUUID, isReady = true, MsgType.GameStart).unsafeRunAndForget()
-
-      case code => println(s"Unknown TCP code: $code")
+      case MsgType.GameStart =>
+        val tmr = bb.getShort
+        Motor.timer = if (tmr == 0) {
+          Motor.startGame = true
+          "GO!"
+        } else if (tmr == -1) "" else tmr.toString
+      case _ =>
     }
   }
 
