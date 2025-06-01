@@ -4,7 +4,8 @@ import cats.effect.{ExitCode, IO}
 import com.comcast.ip4s.{Host, IpAddress, IpLiteralSyntax, Port, SocketAddress}
 import fs2.io.net.{Datagram, Network, Socket}
 import fs2.{Chunk, Stream}
-import game.Motor
+import game.{Motor, PlayerInput}
+import cats.effect.unsafe.implicits.global
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.nio.charset.StandardCharsets
@@ -12,7 +13,7 @@ import java.util.UUID
 import scala.concurrent.duration.DurationInt
 
 object Server {
-  case class CarState(uuid: UUID, x: Double, y: Double, vx: Double, vy: Double, direction: Double)
+  case class CarState(uuid: UUID, x: Float, y: Float, vx: Float, vy: Float, direction: Float)
 
   val defaultUUID: UUID = UUID.randomUUID()
 
@@ -83,16 +84,24 @@ object Server {
     Stream.resource(Network[IO].openDatagramSocket()).flatMap { socket =>
       val serverAddr = SocketAddress[IpAddress](serverHost, serverPort)
 
-      // Simulate sending an input every second
-      Stream.awakeEvery[IO](1.second).evalMap { _ =>
-        val input = s"${defaultUUID}${-0.4}${0.8}${true}"
-        val datagram = Datagram(serverAddr, Chunk.array(input.getBytes(StandardCharsets.UTF_8)))
-        socket.write(datagram)
-      }.concurrently {
-        socket.reads.evalMap { datagram =>
-          val msg = decodeCarState(datagram.bytes.toArray)
-          IO.println(s"[UDP] Car update received: ${msg.getOrElse(Array.empty[CarState]).mkString(", ")}")
+      socket.reads.evalMap { datagram =>
+        val carStates = decodeCarState(datagram.bytes.toArray)
+        val personalCarState = carStates.getOrElse(Array.empty[CarState]).find(_.uuid.equals(defaultUUID))
+        if (personalCarState.isDefined && Motor.kart != null) {
+          val car = personalCarState.get
+          Motor.kart.x = car.x
+          Motor.kart.y = car.y
+          Motor.kart.speedX = car.vx
+          Motor.kart.speedY = car.vy
+          Motor.kart.angle = car.direction
         }
+        IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
+      }.concurrently {
+          Stream.awakeEvery[IO](33.millis)/*.evalFilter(_ => Motor.startGame)*/.evalMap { _ =>
+            val inputsByte = encodeInputs(Motor.inputs.get.unsafeRunSync())
+            val datagram = Datagram(serverAddr, inputsByte)
+            socket.write(datagram)
+          }
       }
     }
 
@@ -167,10 +176,30 @@ object Server {
         Motor.gameSettings = (mapName, x0, y0, direction)
         Motor.startGame = true
 
-        sendReady(socketUnsafe.get, defaultUUID, isReady = true, MsgType.GameStart)
+        sendReady(socketUnsafe.get, defaultUUID, isReady = true, MsgType.GameStart).unsafeRunAndForget()
 
       case code => println(s"Unknown TCP code: $code")
     }
+  }
+
+  def encodeInputs(inputs: PlayerInput): Chunk[Byte] = {
+    // uuid / throttle / steer / drift
+    val packetSize = 16 + 4 + 4 + 1
+    val buf = ByteBuffer.allocate(packetSize).order(ByteOrder.BIG_ENDIAN)
+
+    val throttle = math.min(1, math.max(-1, math.max(inputs.forwardKB, inputs.forwardC) + math.min(inputs.backwardKB, inputs.backwardC)))
+    val steer = math.min(1, math.max(-1, math.max(inputs.steerRightKB, inputs.steerRightC) + math.min(inputs.steerLeftKB, inputs.steerLeftC)))
+    val drift = inputs.driftKB || inputs.driftC
+
+    buf.putLong(defaultUUID.getMostSignificantBits)
+    buf.putLong(defaultUUID.getLeastSignificantBits)
+    buf.putFloat(throttle)
+    buf.putFloat(steer)
+    buf.put(if (drift) 1.toByte else 0.toByte)
+
+    buf.flip()
+
+    Chunk.byteBuffer(buf)
   }
 
   def init(username: String, mode: String = "PROD"): IO[ExitCode] = {
