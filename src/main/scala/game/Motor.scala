@@ -13,6 +13,8 @@ import menu.Menu
 import server.Server
 import utils.GraphicsUtils
 
+import scala.concurrent.Future
+
 case class PlayerInput(forwardKB: Float = 0, backwardKB: Float = 0, steerLeftKB: Float = 0, steerRightKB: Float = 0, driftKB: Boolean = false,
                        forwardC: Float = 0, backwardC: Float = 0, steerLeftC: Float = 0, steerRightC: Float = 0, driftC: Boolean = false)
 

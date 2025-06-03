@@ -75,7 +75,6 @@ object Server {
             socket.readN(len).map(_.toArray)
           }
         }.evalMap { payload =>
-          println("Received a message of length:" + payload.length)
           decodeTCP(payload)
           IO.unit
         }
@@ -182,7 +181,8 @@ object Server {
 
       case MsgType.GameStart =>
         val tmr = bb.getShort
-        Motor.timer = if (tmr == 0) {
+        Motor.timer = if (tmr == 99) "WAITING..."
+        else if (tmr == 0) {
           Motor.startGame = true
           "GO!"
         } else if (tmr == -1) "" else tmr.toString
