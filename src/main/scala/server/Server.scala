@@ -14,12 +14,13 @@ import scala.concurrent.duration.DurationInt
 
 object Server {
   case class CarState(uuid: UUID, x: Float, y: Float, vx: Float, vy: Float, direction: Float)
+  case class PlayerState(uuid: UUID, ts: Long, segment: Int, segmentDist: Float, laps: Int, lapsDist : Float, lapTime: Long, totalTime: Long, bestLap: Long, lastLap: Long)
 
   val defaultUUID: UUID = UUID.randomUUID()
 
   //val socketRef: IO[Ref[IO, Option[Socket[IO]]]] = Ref.of[IO, Option[Socket[IO]]](None)
   var socketUnsafe: Option[Socket[IO]] = None
-  var usernameUnsafe: String = "User" + (100 + math.random() * 100).floor.toInt
+  var usernameUnsafe: String = "Player " + (100 + math.random() * 100).floor.toInt
   var readyUnsafe = false
   var lobbyUnsafe: String = "No lobby"
 
@@ -29,6 +30,9 @@ object Server {
     val LobbyState: Byte = 0x03
     val GameInit: Byte = 0x04
     val GameStart: Byte = 0x05
+    val CarState: Byte = 0x11
+    val PlayerInput: Byte = 0x12
+    val PlayerState: Byte = 0x13
   }
 
   // Call whenever it will be needed to send a ready packet (working fine)
@@ -85,19 +89,27 @@ object Server {
       val serverAddr = SocketAddress[IpAddress](serverHost, serverPort)
 
       socket.reads.evalMap { datagram =>
-        val carStates = decodeCarState(datagram.bytes.toArray)
-        val personalCarState = carStates.getOrElse(Array.empty[CarState]).find(_.uuid.equals(defaultUUID))
-        if (personalCarState.isDefined && Motor.kart != null) {
-          val car = personalCarState.get
-          Motor.kart.x = car.x
-          Motor.kart.y = car.y
-          Motor.kart.speedX = car.vx
-          Motor.kart.speedY = car.vy
-          Motor.kart.angle = car.direction
+        datagram.bytes.toArray.head match {
+          case MsgType.CarState => val
+            carStates = decodeCarState(datagram.bytes.toArray.tail)
+            val personalCarState = carStates.getOrElse(Array.empty[CarState]).find(_.uuid.equals(defaultUUID))
+            if (personalCarState.isDefined && Motor.kart != null) {
+              val car = personalCarState.get
+              Motor.kart.x = car.x
+              Motor.kart.y = car.y
+              Motor.kart.speedX = car.vx
+              Motor.kart.speedY = car.vy
+              Motor.kart.angle = car.direction
+            }
+            IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
+          case MsgType.PlayerState =>
+            val playerStates = decodePlayerState(datagram.bytes.toArray.tail)
+            val personalPlayerState = playerStates.getOrElse(Array.empty[PlayerState]).find(_.uuid.equals(defaultUUID))
+            if (personalPlayerState.isDefined) Motor.player = personalPlayerState.get
+            IO.println(s"[UDP] Player update received: ${playerStates.getOrElse(Array.empty[PlayerState]).mkString(", ")}")
         }
-        IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
       }.concurrently {
-          Stream.awakeEvery[IO](33.millis)/*.evalFilter(_ => Motor.startGame)*/.evalMap { _ =>
+          Stream.awakeEvery[IO](33.millis).evalMap { _ =>
             if (!Motor.startGame) IO.unit
             else {
               val inputsByte = encodeInputs(Motor.inputs.get.unsafeRunSync())
@@ -108,8 +120,7 @@ object Server {
       }
     }
 
-  val recordSize: Int = 16 + 5 * 4
-
+  val carStateRecordSize: Int = 16 + 5 * 4
   def decodeCarState(bytes: Array[Byte]): Option[Array[CarState]] = {
 
     if (bytes.length < 2) return None
@@ -118,7 +129,7 @@ object Server {
 
     val count = bb.getShort
 
-    if (count > 0 && bytes.length == 2 + count * recordSize) {
+    if (count > 0 && bytes.length == 2 + count * carStateRecordSize) {
       val carStates = new Array[CarState](count)
 
       for (i <- 0 until count) {
@@ -139,6 +150,38 @@ object Server {
 
       Some(carStates)
     } else Some(Array.empty[CarState])
+  }
+
+  val playerStateRecordSize: Int = 16 + 4 * 4 + 4 * 8
+  def decodePlayerState(bytes: Array[Byte]): Option[Array[PlayerState]] = {
+    if (bytes.length < 2) return None
+
+    val bb = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
+
+    val count = bb.getShort
+
+    if (count > 0 && bytes.length == 2 + count * playerStateRecordSize) {
+      val playerStates = new Array[PlayerState](count)
+
+      for (i <- 0 until count) {
+        val msb = bb.getLong
+        val lsb = bb.getLong
+        val uuid = new UUID(msb, lsb)
+
+        val segment = bb.getInt
+        val segmentDist = bb.getFloat
+        val laps = bb.getInt
+        val lapsDist = bb.getFloat
+        val lapTime = bb.getLong
+        val totalTime = bb.getLong
+        val bestLap = bb.getLong
+        val lastLap = bb.getLong
+
+      playerStates(i) = PlayerState(uuid, System.currentTimeMillis(), segment, segmentDist, laps, lapsDist, lapTime, totalTime, bestLap, lastLap)
+      }
+
+      Some(playerStates)
+    } else Some(Array.empty[PlayerState])
   }
 
   def decodeTCP(bytes: Array[Byte]): Unit = {
