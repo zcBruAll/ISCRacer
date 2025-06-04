@@ -18,8 +18,8 @@ class GameScreen extends Screen {
    */
   override def init(stage: Stage, skin: Skin): Unit = {
     this.stage = stage
-
-    Motor.init("map_1")
+    val settings = Motor.gameSettings
+    Motor.init(settings._1, settings._2, settings._3, settings._4)
   }
 
   /**

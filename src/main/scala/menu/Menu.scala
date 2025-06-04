@@ -4,6 +4,8 @@ import ch.hevs.gdx2d.desktop.{Game2D, GdxConfig, PortableApplication}
 import ch.hevs.gdx2d.lib.GdxGraphics
 import com.badlogic.gdx.{Gdx, InputMultiplexer, InputProcessor}
 import com.badlogic.gdx.backends.lwjgl.{LwjglApplication, LwjglApplicationConfiguration}
+import com.badlogic.gdx.graphics.g2d.BitmapFont
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.utils.viewport.ScreenViewport
@@ -34,6 +36,22 @@ class Menu private(var width: Int, var height: Int, fullScreen: Boolean) extends
 
   private var screenManager: ScreenManager = _
 
+  private var consolasFontStyle: BitmapFont = _
+
+  def consolasFont: BitmapFont = consolasFontStyle
+
+  def initConsolasFont(): Unit = {
+    val fontFile = Gdx.files.internal("src/main/assets/fonts/consola.ttf")
+    val gen = new FreeTypeFontGenerator(fontFile)
+    val param = new FreeTypeFontGenerator.FreeTypeFontParameter
+    param.size = 18
+    param.spaceX = 0
+    param.spaceY = 0
+    param.characters = FreeTypeFontGenerator.DEFAULT_CHARS
+    consolasFontStyle = gen.generateFont(param)
+    gen.dispose()
+  }
+
   override def onInit(): Unit = {
     stage = new Stage(new ScreenViewport())
 
@@ -41,6 +59,8 @@ class Menu private(var width: Int, var height: Int, fullScreen: Boolean) extends
     Gdx.input.setInputProcessor(multiplexer)
 
     skin = new Skin(Gdx.files.internal("src/main/assets/ui/uiskin.json"))
+
+    initConsolasFont()
 
     screenManager = new ScreenManager(stage, skin)
     screenManager.switchTo(MainMenu)

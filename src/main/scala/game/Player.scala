@@ -29,7 +29,7 @@ class Player(track: Track, checkpointSkipLimit: Int = 2) {
     kart.x = cp.x
     kart.y = cp.y
     kart.angle = math.tan((nextCP.y / cp.y) / (nextCP.x / cp.x)).toFloat
-    kart.speed = 0f
+    kart.speedX = 0f
   }
 
   def bestLap: String = {

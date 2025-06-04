@@ -1,5 +1,8 @@
 package game
 
+import cats.effect.IO
+import cats.effect.kernel.Ref
+import cats.effect.unsafe.implicits.global
 import ch.hevs.gdx2d.lib.GdxGraphics
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input.Keys
@@ -7,21 +10,30 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.graphics.Color
 import menu.Menu
-import utils.GraphicsUtils
+import server.Server
+import server.Server.{PlayerState, defaultUUID}
+import utils.{Conversion, GraphicsUtils}
+
+case class PlayerInput(forwardKB: Float = 0, backwardKB: Float = 0, steerLeftKB: Float = 0, steerRightKB: Float = 0, driftKB: Boolean = false,
+                       forwardC: Float = 0, backwardC: Float = 0, steerLeftC: Float = 0, steerRightC: Float = 0, driftC: Boolean = false)
 
 object Motor {
+  val inputs: Ref[IO, PlayerInput] = Ref.of[IO, PlayerInput](PlayerInput()).unsafeRunSync()
+
   private var mode7Renderer: Mode7Renderer = _
 
-  private var kart: Kart = _
-  private var camera: Camera = _
-  private var track: Track = _
-  private var player: Player = _
+  private var _kart: Kart = _
+  def kart: Kart = _kart
 
-  private var forward: Boolean = false
-  private var backward: Boolean = false
-  private var left: Boolean = false
-  private var right: Boolean = false
-  private var drift: Boolean = false
+  private var _camera: Camera = _
+  def camera: Camera = _camera
+
+  private var _track: Track = _
+  def track: Track = _track
+
+  private var _player: PlayerState = PlayerState(defaultUUID, System.currentTimeMillis(), 0, 0f, 0, 0f, 0L, 0L, 0L, 0L)
+  def player: PlayerState = _player
+  def player_=(value: PlayerState): Unit = _player = value
 
   private var debug: Boolean = true
 
@@ -34,19 +46,25 @@ object Motor {
   private val height: Int = menu.height
   private val horizon: Int = height / 3
 
+  var initGame: Boolean = false
   private var initiated: Boolean = false
+  var timer: String = ""
+  var startGame: Boolean = false
 
-  def init(map: String): Unit = {
-    track = new Track(map)
-    initKart()
-    camera = new Camera()
-    player = new Player(track)
+  var gameSettings: (String, Int, Int, Float) = _
 
-    mode7Renderer = new Mode7Renderer(track.mapTexture)
+  def init(map: String, x0: Int, y0: Int, direction: Float): Unit = {
+    _track = new Track(map)
+    initKart(x0, y0, direction)
+    _camera = new Camera()
+
+    mode7Renderer = new Mode7Renderer(_track.mapTexture)
 
     initFonts()
 
     initiated = true
+
+    Server.sendReady(Server.socketUnsafe.get, Server.defaultUUID, isReady = true, Server.MsgType.GameStart).unsafeRunAndForget()
   }
 
   def render(g: GdxGraphics): Unit = {
@@ -56,61 +74,35 @@ object Motor {
     g.setColor(Color.SKY)
     g.drawFilledRectangle(width / 2, height - (horizon / 2), width, horizon, 0)
 
-    if (forward)
-      kart.accelerate()
-    else if (backward && kart.speed > 0)
-      kart.brake()
-    else if (backward)
-      kart.accelerate(false)
-    else
-      kart.applyFriction()
+    _camera.update(_kart)
 
-    if (drift && (left || right))
-      kart.drift(right)
-    else if (left || right)
-      kart.rotate(right)
+    mode7Renderer.render(_camera.x, _camera.y, _camera.angle, _camera.scale, _camera.fov, horizon)
 
-    kart.update()
-    kart.move()
+    g.drawTransformedPicture(width / 2, height / 4, 0, 3, _kart.texture)
 
-    val segmentInfo = track.closestSegmentAndProgress(kart.x, kart.y)
+    g.drawStringCentered(150, Conversion.longToTimeString(_player.lapTime), lapTimeFont)
+    g.drawStringCentered(80, Conversion.longToTimeString(_player.totalTime), totalTimeFont)
+    if (timer != "") g.drawStringCentered(540, timer, lapTimeFont)
 
-    player.update(segmentInfo._1, kart)
-
-    camera.update(kart)
-
-    mode7Renderer.render(camera.x + camera.offsetX, camera.y + camera.offsetY, camera.angle, camera.scale, camera.fov, horizon)
-
-    g.drawTransformedPicture(width / 2, height / 4, 0, 3, kart.texture)
-
-    g.drawStringCentered(150, player.lapTime, lapTimeFont)
-    g.drawStringCentered(80, player.totalTime, totalTimeFont)
-
-    if (debug) displayDebug(g, segmentInfo)
+    if (debug) displayDebug(g)
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
   }
 
-  private def initKart(): Unit = {
-    kart = new Kart()
-    kart.fps = menu.gd.getDisplayMode.getRefreshRate
-    if (track.checkpoints.nonEmpty) {
-      val c0 = track.checkpoints.head
-      val c1 = track.checkpoints(1)
-      kart.x = c0.x
-      kart.y = c0.y
-      kart.angle = math.tan((c1.y - c0.y) / (c1.x - c0.x)).toFloat
-    }
+  private def initKart(x0: Int, y0: Int, direction: Float): Unit = {
+    _kart = new Kart()
+    _kart.x = x0
+    _kart.y = y0
+    _kart.angle = direction
   }
 
   def onKeyDown(keycode: Int): Unit = {
     if (!initiated) return
     keycode match {
-      case Keys.W => forward = true
-      case Keys.S => backward = true
-      case Keys.A => left = true
-      case Keys.D => right = true
-      case Keys.SHIFT_LEFT => drift = true
-      case Keys.ENTER => player.startLap()
+      case Keys.W => inputs.update(p => p.copy(forwardKB = 1f)).unsafeRunSync()
+      case Keys.S => inputs.update(p => p.copy(backwardKB = -1f)).unsafeRunSync()
+      case Keys.A => inputs.update(p => p.copy(steerLeftKB = -1f)).unsafeRunSync()
+      case Keys.D => inputs.update(p => p.copy(steerRightKB = 1f)).unsafeRunSync()
+      case Keys.SHIFT_LEFT => inputs.update(p => p.copy(driftKB = true)).unsafeRunSync()
       case _ =>
     }
   }
@@ -118,11 +110,11 @@ object Motor {
   def onKeyUp(keycode: Int): Unit = {
     if (!initiated) return
     keycode match {
-      case Keys.W => forward = false
-      case Keys.S => backward = false
-      case Keys.A => left = false
-      case Keys.D => right = false
-      case Keys.SHIFT_LEFT => drift = false
+      case Keys.W => inputs.update(p => p.copy(forwardKB = 0f)).unsafeRunSync()
+      case Keys.S => inputs.update(p => p.copy(backwardKB = 0f)).unsafeRunSync()
+      case Keys.A => inputs.update(p => p.copy(steerLeftKB = 0f)).unsafeRunSync()
+      case Keys.D => inputs.update(p => p.copy(steerRightKB = 0f)).unsafeRunSync()
+      case Keys.SHIFT_LEFT => inputs.update(p => p.copy(driftKB = false)).unsafeRunSync()
       case _ =>
     }
   }
@@ -144,24 +136,23 @@ object Motor {
     lapTimeFont = generator.generateFont(paramLapTime)
   }
 
-  def displayDebug(g: GdxGraphics, segmentInfo: (Int, Float, Float, Float)): Unit = {
-    g.drawString(10, 20, "Laps: " + player.lapsCompleted)
-    g.drawString(10, 40, "Segment: " + segmentInfo._1)
-    g.drawString(10, 60, "SegDist: " + segmentInfo._2)
-    g.drawString(10, 80, "TotDist: " + segmentInfo._3)
-    g.drawString(10, 100, "DistPer: " + segmentInfo._4)
+  def displayDebug(g: GdxGraphics): Unit = {
+    g.drawString(10, 20, "Laps: " + _player.laps)
+    g.drawString(10, 40, "Segment: " + _player.segment)
+    g.drawString(10, 60, "SegDist: " + _player.segmentDist)
+    g.drawString(10, 80, "TotDist: " + _player.totalTime)
 
-    g.drawString(10, 220, "Speed: " + kart.speed.toString)
-    g.drawString(10, 240, "X: " + kart.x.toString)
-    g.drawString(10, 260, "Y: " + kart.y.toString)
-    g.drawString(10, 280, "Angle: " + kart.angle.toString)
+    g.drawString(10, 220, "Speed: " + _kart.speedX.toString)
+    g.drawString(10, 240, "X: " + _kart.x.toString)
+    g.drawString(10, 260, "Y: " + _kart.y.toString)
+    g.drawString(10, 280, "Angle: " + _kart.angle.toString)
 
-    g.drawString(10, 320, "X: " + camera.x.toString)
-    g.drawString(10, 340, "Y: " + camera.y.toString)
-    g.drawString(10, 360, "Angle: " + camera.angle.toString)
+    g.drawString(10, 320, "X: " + _camera.x.toString)
+    g.drawString(10, 340, "Y: " + _camera.y.toString)
+    g.drawString(10, 360, "Angle: " + _camera.angle.toString)
 
-    g.drawString(10, 400, "Best Lap: " + player.bestLap)
-    g.drawString(10, 420, "Last Lap: " + player.lastLap)
+    g.drawString(10, 400, "Best Lap: " + Conversion.longToTimeString(_player.bestLap))
+    g.drawString(10, 420, "Last Lap: " + Conversion.longToTimeString(_player.lastLap))
   }
 
   /**
@@ -169,8 +160,8 @@ object Motor {
    */
   def dispose(): Unit = {
     mode7Renderer.dispose()
-    kart.dispose()
-    track.dispose()
+    _kart.dispose()
+    _track.dispose()
     initiated = false
   }
 }

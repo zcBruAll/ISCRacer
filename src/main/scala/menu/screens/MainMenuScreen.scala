@@ -5,7 +5,7 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.ui.{Skin, TextButton}
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.scenes.scene2d.{Actor, InputEvent, Stage}
-import menu.{Game, MainMenu, Menu, Settings}
+import menu.{Game, Lobby, MainMenu, Menu, Settings}
 
 class MainMenuScreen extends Screen {
 
@@ -35,7 +35,7 @@ class MainMenuScreen extends Screen {
 
     btnPlay.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
-        Menu.screenManager.switchTo(Game)
+        Menu.screenManager.switchTo(Lobby)
       }
     })
 

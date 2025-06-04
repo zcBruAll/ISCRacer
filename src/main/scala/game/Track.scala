@@ -11,7 +11,6 @@ class Track(val name: String) {
   val checkpoints: List[Checkpoint] = loadCheckpoints(baseTrackDir + "points.json")
 
   val mapTexture = new Texture(Gdx.files.internal(baseTrackDir + "texture.png"))
-  val grayscaleTexture = new Texture(Gdx.files.internal(baseTrackDir+ "grayscale.png"))
 
   val segmentLengths: Array[Float] = checkpoints
       .sliding(2)
@@ -72,6 +71,5 @@ class Track(val name: String) {
 
   def dispose(): Unit = {
     mapTexture.dispose()
-    grayscaleTexture.dispose()
   }
 }
