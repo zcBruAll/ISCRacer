@@ -6,6 +6,8 @@ import com.badlogic.gdx.{Gdx, InputMultiplexer, InputProcessor}
 import com.badlogic.gdx.backends.lwjgl.{LwjglApplication, LwjglApplicationConfiguration}
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
+import com.badlogic.gdx.controllers.Controller
+import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.utils.viewport.ScreenViewport
@@ -75,7 +77,6 @@ class Menu private(var width: Int, var height: Int, fullScreen: Boolean) extends
 
   override def onKeyDown(keycode: Int): Unit = {
     super.onKeyDown(keycode)
-
     Motor.onKeyDown(keycode)
   }
 
@@ -83,6 +84,37 @@ class Menu private(var width: Int, var height: Int, fullScreen: Boolean) extends
     super.onKeyUp(keycode)
 
     Motor.onKeyUp(keycode)
+  }
+
+  override def onControllerConnected(controller: Controller): Unit = {
+    super.onControllerConnected(controller)
+
+    Motor.onControllerConnected(controller)
+  }
+
+  override def onControllerDisconnected(controller: Controller): Unit = {
+    super.onControllerDisconnected(controller)
+
+    Motor.onControllerDisconnected(controller)
+  }
+
+  override def onControllerAxisMoved(controller: Controller, axisCode: Int, value: Float): Unit = {
+    super.onControllerAxisMoved(controller, axisCode, value)
+    // axe 1 pour y et 0 pour x
+
+    Motor.onControllerAxisMoved(controller, axisCode, value)
+  }
+
+  override def onControllerKeyDown(controller: Controller, buttonCode: Int): Unit = {
+    super.onControllerKeyDown(controller, buttonCode)
+
+    Motor.onControllerKeyDown(controller, buttonCode)
+  }
+
+  override def onControllerKeyUp(controller: Controller, buttonCode: Int): Unit = {
+    super.onControllerKeyUp(controller, buttonCode)
+
+    Motor.onControllerKeyUp(controller, buttonCode)
   }
 
   private def createLwjglApplication(): Unit = {

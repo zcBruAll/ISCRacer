@@ -9,6 +9,7 @@ import com.badlogic.gdx.Input.Keys
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.math.Vector3
 import menu.Menu
 import server.Server
 import server.Server.{PlayerState, defaultUUID}
@@ -16,6 +17,11 @@ import utils.{Conversion, GraphicsUtils}
 
 case class PlayerInput(forwardKB: Float = 0, backwardKB: Float = 0, steerLeftKB: Float = 0, steerRightKB: Float = 0, driftKB: Boolean = false,
                        forwardC: Float = 0, backwardC: Float = 0, steerLeftC: Float = 0, steerRightC: Float = 0, driftC: Boolean = false)
+import utils.GraphicsUtils
+import com.badlogic.gdx.controllers.Controller
+import com.badlogic.gdx.scenes.scene2d.ui.Slider
+
+import javax.naming.ldap.Control
 
 object Motor {
   val inputs: Ref[IO, PlayerInput] = Ref.of[IO, PlayerInput](PlayerInput()).unsafeRunSync()
@@ -93,6 +99,48 @@ object Motor {
     _kart.x = x0
     _kart.y = y0
     _kart.angle = direction
+  }
+  def onControllerConnected(controller: Controller): Unit = {}
+
+  def onControllerDisconnected(controller: Controller){}
+
+  def onControllerAxisMoved(controller: Controller, axisCode: Int, value: Float): Unit = {
+
+    // Gauche Droite
+    var vDirection = controller.getAxis(0)
+    if(vDirection > 0.07) inputs.update(p => p.copy(steerRightC = vDirection)).unsafeRunSync()
+    else if(vDirection < -0.07) inputs.update(p => p.copy(steerLeftC = vDirection)).unsafeRunSync()
+
+    // Avancer Reculer
+    val vForw = controller.getAxis(4)
+    println(s"a/r = $vForw, g/d = $vDirection")
+    if(vForw >= 1.0) {
+      inputs.update(p => p.copy(forwardC = 0)).unsafeRunSync()
+      inputs.update(p => p.copy(backwardC = 0)).unsafeRunSync()
+    }
+    else if(vForw >= 0.4 && vForw < 1.0) inputs.update(p => p.copy(backwardC = -vForw)).unsafeRunSync()
+    else if(vForw <= -0.4) inputs.update(p => p.copy(forwardC = -vForw)).unsafeRunSync()
+    else {
+      inputs.update(p => p.copy(forwardC = 0)).unsafeRunSync()
+      inputs.update(p => p.copy(backwardC = 0)).unsafeRunSync()
+    }
+  }
+
+  def onControllerKeyDown(controller: Controller, buttonCode: Int): Unit = {
+    buttonCode match{
+      case 0 => inputs.update(p => p.copy(driftKB = true)).unsafeRunSync()
+      case 4 => inputs.update(p => p.copy(driftKB = true)).unsafeRunSync()
+      case _ =>
+      // 0 et 4 por drifter (l1 et A)
+      }
+  }
+
+  def onControllerKeyUp(controller: Controller, buttonCode: Int): Unit = {
+    buttonCode match{
+      case 0 => inputs.update(p => p.copy(driftKB = false)).unsafeRunSync()
+      case 4 => inputs.update(p => p.copy(driftKB = false)).unsafeRunSync()
+      case _ =>
+    }
   }
 
   def onKeyDown(keycode: Int): Unit = {
