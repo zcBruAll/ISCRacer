@@ -14,7 +14,7 @@ import scala.concurrent.duration.DurationInt
 
 object Server {
   case class CarState(uuid: UUID, x: Float, y: Float, vx: Float, vy: Float, direction: Float)
-  case class PlayerState(uuid: UUID, ts: Long, segment: Int, segmentDist: Float, laps: Int, lapsDist : Float, lapTime: Long, totalTime: Long, bestLap: Long, lastLap: Long)
+  case class PlayerState(uuid: UUID, username: String, ts: Long, segment: Int, segmentDist: Float, laps: Int, lapsDist : Float, lapTime: Long, totalTime: Long, bestLap: Long, lastLap: Long)
 
   val defaultUUID: UUID = UUID.randomUUID()
 
@@ -103,10 +103,11 @@ object Server {
             }
             IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
           case MsgType.PlayerState =>
-            val playerStates = decodePlayerState(datagram.bytes.toArray.tail)
-            val personalPlayerState = playerStates.getOrElse(Array.empty[PlayerState]).find(_.uuid.equals(defaultUUID))
+            val playerStates = decodePlayerState(datagram.bytes.toArray.tail).getOrElse(Array.empty[PlayerState]).map(e => e.uuid -> e).toMap
+            Motor.players = playerStates
+            val personalPlayerState = playerStates.get(defaultUUID)
             if (personalPlayerState.isDefined) Motor.player = personalPlayerState.get
-            IO.println(s"[UDP] Player update received: ${playerStates.getOrElse(Array.empty[PlayerState]).mkString(", ")}")
+            IO.println(s"[UDP] Player update received: ${playerStates.mkString(", ")}")
         }
       }.concurrently {
           Stream.awakeEvery[IO](33.millis).evalMap { _ =>
@@ -152,7 +153,7 @@ object Server {
     } else Some(Array.empty[CarState])
   }
 
-  val playerStateRecordSize: Int = 16 + 4 * 4 + 4 * 8
+  val playerStateRecordSize: Int = 16 + 1 + 4 * 4 + 4 * 8
   def decodePlayerState(bytes: Array[Byte]): Option[Array[PlayerState]] = {
     if (bytes.length < 2) return None
 
@@ -160,13 +161,18 @@ object Server {
 
     val count = bb.getShort
 
-    if (count > 0 && bytes.length == 2 + count * playerStateRecordSize) {
+    if (count > 0 && bytes.length >= 2 + count * playerStateRecordSize) {
       val playerStates = new Array[PlayerState](count)
 
       for (i <- 0 until count) {
         val msb = bb.getLong
         val lsb = bb.getLong
         val uuid = new UUID(msb, lsb)
+
+        val usernameLength = bb.get()
+        val usernameBytes = new Array[Byte](usernameLength)
+        bb.get(usernameBytes)
+        val username = new String(usernameBytes, StandardCharsets.UTF_8)
 
         val segment = bb.getInt
         val segmentDist = bb.getFloat
@@ -177,7 +183,7 @@ object Server {
         val bestLap = bb.getLong
         val lastLap = bb.getLong
 
-      playerStates(i) = PlayerState(uuid, System.currentTimeMillis(), segment, segmentDist, laps, lapsDist, lapTime, totalTime, bestLap, lastLap)
+        playerStates(i) = PlayerState(uuid, username, System.currentTimeMillis(), segment, segmentDist, laps, lapsDist, lapTime, totalTime, bestLap, lastLap)
       }
 
       Some(playerStates)

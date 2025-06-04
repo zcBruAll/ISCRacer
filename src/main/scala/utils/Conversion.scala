@@ -14,4 +14,11 @@ object Conversion {
     else
       f"$seconds%d.$millis%03d"
   }
+
+  def formatTime(ms: Long): String = {
+    val minutes = ms / 60000
+    val seconds = (ms % 60000) / 1000
+    val millis  = ms % 1000
+    f"$minutes%02d:$seconds%02d.${millis}%03d"
+  }
 }

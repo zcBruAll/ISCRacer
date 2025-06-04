@@ -10,10 +10,14 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Vector3
+import com.badlogic.gdx.utils.Align
 import menu.Menu
 import server.Server
 import server.Server.{PlayerState, defaultUUID}
+import utils.Conversion.formatTime
 import utils.{Conversion, GraphicsUtils}
+
+import java.util.UUID
 
 case class PlayerInput(forwardKB: Float = 0, backwardKB: Float = 0, steerLeftKB: Float = 0, steerRightKB: Float = 0, driftKB: Boolean = false,
                        forwardC: Float = 0, backwardC: Float = 0, steerLeftC: Float = 0, steerRightC: Float = 0, driftC: Boolean = false)
@@ -37,12 +41,17 @@ object Motor {
   private var _track: Track = _
   def track: Track = _track
 
-  private var _player: PlayerState = PlayerState(defaultUUID, System.currentTimeMillis(), 0, 0f, 0, 0f, 0L, 0L, 0L, 0L)
+  private var _player: PlayerState = PlayerState(defaultUUID, "Player 000", System.currentTimeMillis(), 0, 0f, 0, 0f, 0L, 0L, 0L, 0L)
   def player: PlayerState = _player
   def player_=(value: PlayerState): Unit = _player = value
 
+  private var _players: Map[UUID, PlayerState] = Map.empty[UUID, PlayerState]
+  def players: Map[UUID, PlayerState] = _players
+  def players_=(value: Map[UUID, PlayerState]): Unit = _players = value
+
   private var debug: Boolean = true
 
+  private var personalTimeFont: BitmapFont = _
   private var totalTimeFont: BitmapFont = _
   private var lapTimeFont: BitmapFont = _
 
@@ -91,6 +100,7 @@ object Motor {
     if (timer != "") g.drawStringCentered(540, timer, lapTimeFont)
 
     if (debug) displayDebug(g)
+    displayLeaderboard(g)
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
   }
 
@@ -177,6 +187,12 @@ object Motor {
     paramTotalTime.hinting = FreeTypeFontGenerator.Hinting.Full
     totalTimeFont = generator.generateFont(paramTotalTime)
 
+    val paramPersonalTime = new FreeTypeFontGenerator.FreeTypeFontParameter
+    paramTotalTime.color = Color.LIME
+    paramTotalTime.size = generator.scaleForPixelHeight(36)
+    paramTotalTime.hinting = FreeTypeFontGenerator.Hinting.Full
+    personalTimeFont = generator.generateFont(paramTotalTime)
+
     val paramLapTime = new FreeTypeFontGenerator.FreeTypeFontParameter
     paramLapTime.color = Color.WHITE
     paramLapTime.size = generator.scaleForPixelHeight(72)
@@ -188,7 +204,7 @@ object Motor {
     g.drawString(10, 20, "Laps: " + _player.laps)
     g.drawString(10, 40, "Segment: " + _player.segment)
     g.drawString(10, 60, "SegDist: " + _player.segmentDist)
-    g.drawString(10, 80, "TotDist: " + _player.totalTime)
+    g.drawString(10, 80, "TotDist: " + _player.lapsDist)
 
     g.drawString(10, 220, "Speed: " + _kart.speedX.toString)
     g.drawString(10, 240, "X: " + _kart.x.toString)
@@ -201,6 +217,62 @@ object Motor {
 
     g.drawString(10, 400, "Best Lap: " + Conversion.longToTimeString(_player.bestLap))
     g.drawString(10, 420, "Last Lap: " + Conversion.longToTimeString(_player.lastLap))
+  }
+
+  def displayLeaderboard(g: GdxGraphics): Unit = {
+    // 1) Sort all players by progress: (laps DESC, segment DESC, segmentDist DESC)
+    val sortedPlayers: IndexedSeq[PlayerState] =
+      players.values.toIndexedSeq
+        .filter(_.bestLap != 0).sortBy(p => p.bestLap)
+
+    // 2) Find the index (0-based) of local player in that sorted list
+    val selfRankIndex = sortedPlayers.indexWhere(_.uuid == defaultUUID)
+    println(selfRankIndex)
+    //   If selfRankIndex == -1, the local player isn't in the map; assume no draw.
+
+    // 3) Decide base coordinates and vertical spacing:
+    val xPos     = 1900            // same X you used for "Leaderboard" heading
+    val yStart   = 450             // Y for "1st" entry
+    val ySpacing = 50              // pixels between each line
+
+    // 4) Draw the title (you already do this above, but ensure it’s here or before)
+    g.drawString(1900, 500, "Leaderboard", totalTimeFont, Align.right)
+
+    // 5) Draw positions 1 → 3 (if they exist)
+    for (i <- 0 until math.min(3, sortedPlayers.length)) {
+      val p = sortedPlayers(i)
+      val text = s"${i + 1}. ${p.username}  ${formatTime(p.bestLap)}"
+      g.drawString(xPos, yStart - i * ySpacing, text, if (i == selfRankIndex) personalTimeFont else totalTimeFont, Align.right)
+    }
+
+    // 6) If self is exactly index 3 (i.e. 4th place), draw them at 4th:
+    if (selfRankIndex == 3) {
+      val p4 = sortedPlayers(3)
+      val text4 = s"4. ${p4.username}  ${formatTime(p4.bestLap)}"
+      g.drawString(xPos, yStart - 3 * ySpacing, text4, personalTimeFont, Align.right)
+    }
+    // 7) If self is beyond index 3 (>3), draw ellipsis + neighbours
+    else if (selfRankIndex > 3) {
+      // 7a) Draw "..." at the 4th‐place slot (index 3)
+      g.drawString(xPos, yStart - 3 * ySpacing, "...", totalTimeFont, Align.right)
+
+      // 7b) Draw the player immediately above self (rank = selfRankIndex)
+      val above = sortedPlayers(selfRankIndex - 1)
+      val textAbove = s"${selfRankIndex}. ${above.username}  ${formatTime(above.bestLap)}"
+      g.drawString(xPos, yStart - 4 * ySpacing, textAbove, totalTimeFont, Align.right)
+
+      // 7c) Draw self (rank = selfRankIndex + 1)
+      val selfP = sortedPlayers(selfRankIndex)
+      val textSelf = s"${selfRankIndex + 1}. ${selfP.username}  ${formatTime(selfP.bestLap)}"
+      g.drawString(xPos, yStart - 5 * ySpacing, textSelf, personalTimeFont, Align.right)
+
+      // 7d) If there is a player immediately behind self, draw them too
+      if (selfRankIndex + 1 < sortedPlayers.length) {
+        val below = sortedPlayers(selfRankIndex + 1)
+        val textBelow = s"${selfRankIndex + 2}. ${below.username}  ${formatTime(below.bestLap)}"
+        g.drawString(xPos, yStart - 6 * ySpacing, textBelow, totalTimeFont, Align.right)
+      }
+    }
   }
 
   /**
