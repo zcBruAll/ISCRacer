@@ -240,7 +240,6 @@ object Server {
         } else if (tmr == -1) "" else tmr.toString
       case MsgType.GameEndResults =>
         val count = bb.getShort
-        println("Received game end message")
         Motor.results = (0 until count).map { _ =>
           // Read the two longs for UUID
           val msb  = bb.getLong
@@ -263,6 +262,7 @@ object Server {
 
         Motor.endGame = true
         readyUnsafe = false
+        Motor.inputs.set(PlayerInput()).unsafeRunSync()
         Motor.players = Map.empty
         Motor.player = PlayerState(defaultUUID, usernameUnsafe, System.currentTimeMillis(), 0, 0f, 0, 0f, 0L, 0L, 0L, 0L)
       case _ =>
@@ -281,7 +281,6 @@ object Server {
     buf.putLong(defaultUUID.getMostSignificantBits)
     buf.putLong(defaultUUID.getLeastSignificantBits)
     buf.putFloat(throttle)
-    println("THrottle" + throttle)
     buf.putFloat(steer)
     buf.put(if (drift) 1.toByte else 0.toByte)
 
