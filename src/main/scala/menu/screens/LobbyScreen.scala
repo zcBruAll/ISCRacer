@@ -15,6 +15,7 @@ class LobbyScreen extends Screen {
   private var stage: Stage = _
 
   private var lblLobby: Label = _
+  private var lblResults: Label = _
   private var txtUsername: TextField = _
   private var btnConnect: TextButton = _
   private var btnBack: TextButton = _
@@ -37,6 +38,11 @@ class LobbyScreen extends Screen {
     lblLobby.setSize(300, 500)
     lblLobby.setPosition(20, centerY(lblLobby))
 
+    lblResults = new Label(Motor.resultsFormatted, labelStyle)
+    lblResults.setAlignment(Align.right)
+    lblResults.setSize(300, 500)
+    lblResults.setPosition(stage.getWidth - 20 - lblResults.getWidth, centerY(lblResults))
+
     txtUsername = new TextField(Server.usernameUnsafe, skin)
     txtUsername.setSize(200, 60)
     txtUsername.setPosition(centerX(txtUsername), centerY(txtUsername) - 40)
@@ -50,9 +56,6 @@ class LobbyScreen extends Screen {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
         if (!txtUsername.getText.isBlank) {
           Server.init(txtUsername.getText, "TEST").unsafeRunAndForget()
-          txtUsername.setDisabled(true)
-          btnConnect.setVisible(false)
-          btnReady.setVisible(true)
         }
       }
     })
@@ -67,12 +70,11 @@ class LobbyScreen extends Screen {
         }
       }
     })
-    btnReady.setVisible(false)
 
-    if (Server.socketUnsafe.isDefined) {
-      btnConnect.setVisible(false)
-      btnReady.setVisible(true)
-    }
+    val isSocketDefined = Server.socketUnsafe.isDefined
+    btnConnect.setVisible(!isSocketDefined)
+    btnReady.setVisible(isSocketDefined)
+    txtUsername.setDisabled(isSocketDefined)
 
     btnBack = new TextButton("Back", skin)
     btnBack.setSize(200, 60)
@@ -89,11 +91,16 @@ class LobbyScreen extends Screen {
     this.stage.addActor(btnBack)
     this.stage.addActor(btnReady)
     this.stage.addActor(lblLobby)
+    this.stage.addActor(lblResults)
     addedActors ::= txtUsername
     addedActors ::= btnConnect
     addedActors ::= btnBack
     addedActors ::= btnReady
     addedActors ::= lblLobby
+    addedActors ::= lblResults
+
+    Motor.startGame = false
+    Motor.initGame = false
   }
 
   def updateBtnReady(): Unit = {
@@ -113,7 +120,14 @@ class LobbyScreen extends Screen {
    */
   override def update(g: GdxGraphics): Unit = {
     if (Motor.initGame) Menu.screenManager.switchTo(Game)
+
     lblLobby.setText(Server.lobbyUnsafe)
+
+    val isSocketDefined = Server.socketUnsafe.isDefined
+    btnConnect.setVisible(!isSocketDefined)
+    btnReady.setVisible(isSocketDefined)
+    txtUsername.setDisabled(isSocketDefined)
+
     updateBtnReady()
   }
 

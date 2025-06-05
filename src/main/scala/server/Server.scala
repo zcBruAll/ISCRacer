@@ -23,13 +23,15 @@ object Server {
   var usernameUnsafe: String = "Player " + (100 + math.random() * 100).floor.toInt
   var readyUnsafe = false
   var lobbyUnsafe: String = "No lobby"
+  var connected = false
 
-  object MsgType extends Enumeration {
+  object MsgType {
     val Handshake: Byte = 0x01
     val ReadyUpdate: Byte = 0x02
     val LobbyState: Byte = 0x03
     val GameInit: Byte = 0x04
     val GameStart: Byte = 0x05
+    val GameEndResults: Byte = 0x06
     val CarState: Byte = 0x11
     val PlayerInput: Byte = 0x12
     val PlayerState: Byte = 0x13
@@ -101,13 +103,13 @@ object Server {
               Motor.kart.speedY = car.vy
               Motor.kart.angle = car.direction
             }
-            IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
+            IO.unit//IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
           case MsgType.PlayerState =>
             val playerStates = decodePlayerState(datagram.bytes.toArray.tail).getOrElse(Array.empty[PlayerState]).map(e => e.uuid -> e).toMap
             Motor.players = playerStates
             val personalPlayerState = playerStates.get(defaultUUID)
             if (personalPlayerState.isDefined) Motor.player = personalPlayerState.get
-            IO.println(s"[UDP] Player update received: ${playerStates.mkString(", ")}")
+            IO.unit//IO.println(s"[UDP] Player update received: ${playerStates.mkString(", ")}")
         }
       }.concurrently {
           Stream.awakeEvery[IO](33.millis).evalMap { _ =>
@@ -215,6 +217,7 @@ object Server {
         }
 
         lobbyUnsafe = s"$nbReady/$nbPlayers player${if (nbReady > 1) "s" else ""}\n$timeBeforeStart\n${userlistString.mkString("\n")}"
+
       case MsgType.GameInit =>
         val mapNameLength = bb.get()
         val mapBytes = new Array[Byte](mapNameLength)
@@ -235,6 +238,33 @@ object Server {
           Motor.startGame = true
           "GO!"
         } else if (tmr == -1) "" else tmr.toString
+      case MsgType.GameEndResults =>
+        val count = bb.getShort
+        println("Received game end message")
+        Motor.results = (0 until count).map { _ =>
+          // Read the two longs for UUID
+          val msb  = bb.getLong
+          val lsb  = bb.getLong
+          val uuid = new UUID(msb, lsb)
+
+          // Read the username‐length + bytes
+          val usernameLength = bb.get.toInt             // bb.get returns a Byte, so .toInt is safe
+          val usernameBytes  = new Array[Byte](usernameLength)
+          bb.get(usernameBytes)
+          val username       = new String(usernameBytes, StandardCharsets.UTF_8)
+
+          // Read bestLap and totalTime
+          val bestLap   = bb.getLong
+          val totalTime = bb.getLong
+
+          // Yield a pair: (UUID -> (username, bestLap, totalTime))
+          uuid -> (username, bestLap, totalTime)
+        }.toMap
+
+        Motor.endGame = true
+        readyUnsafe = false
+        Motor.players = Map.empty
+        Motor.player = PlayerState(defaultUUID, usernameUnsafe, System.currentTimeMillis(), 0, 0f, 0, 0f, 0L, 0L, 0L, 0L)
       case _ =>
     }
   }
@@ -251,6 +281,7 @@ object Server {
     buf.putLong(defaultUUID.getMostSignificantBits)
     buf.putLong(defaultUUID.getLeastSignificantBits)
     buf.putFloat(throttle)
+    println("THrottle" + throttle)
     buf.putFloat(steer)
     buf.put(if (drift) 1.toByte else 0.toByte)
 

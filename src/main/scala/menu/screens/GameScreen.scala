@@ -5,7 +5,7 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import game.Motor
-import menu.Menu
+import menu.{Lobby, Menu}
 
 class GameScreen extends Screen {
   private var stage: Stage = _
@@ -20,6 +20,7 @@ class GameScreen extends Screen {
     this.stage = stage
     val settings = Motor.gameSettings
     Motor.init(settings._1, settings._2, settings._3, settings._4)
+    Motor.endGame = false
   }
 
   /**
@@ -27,7 +28,9 @@ class GameScreen extends Screen {
    * Called once per frame in the main render loop.
    */
   override def update(g: GdxGraphics): Unit = {
-    Motor.render(g)
+    if (Motor.endGame) {
+      Menu.screenManager.switchTo(Lobby)
+    } else Motor.render(g)
   }
 
   /**

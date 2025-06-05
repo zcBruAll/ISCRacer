@@ -65,8 +65,42 @@ object Motor {
   private var initiated: Boolean = false
   var timer: String = ""
   var startGame: Boolean = false
+  var endGame: Boolean = false
 
   var gameSettings: (String, Int, Int, Float) = _
+
+  var results: Map[UUID, (String, Long, Long)] = Map.empty[UUID, (String, Long, Long)]
+  def resultsFormatted: String = {
+    if (results.isEmpty) return ""
+    "Best lap times:\n" +
+    {
+      val temp = results.toIndexedSeq.sortBy(p => p._2._2)
+      val selfIndex = temp.map(_._1).indexOf(defaultUUID)
+
+      var top3 = ""
+      for (i <- 0 until math.min(3, temp.length)) {
+        val currentResult = temp(i)
+        if (selfIndex == i) top3 += "YOU "
+        top3 += s"${i+1}) ${currentResult._2._1}: ${formatTime(currentResult._2._2)}\n"
+      }
+
+      if (selfIndex > 3) top3 + s"YOU ${selfIndex+1}) ${temp(selfIndex)._2._1}: ${formatTime(temp(selfIndex)._2._2)}\n" else top3
+    } +
+    "\nBest total time:\n" +
+    {
+      val temp = results.toIndexedSeq.sortBy(p => p._2._3)
+      val selfIndex = temp.map(_._1).indexOf(defaultUUID)
+
+      var top3 = ""
+      for (i <- 0 until math.min(3, temp.length)) {
+        val currentResult = temp(i)
+        if (selfIndex == i) top3 += "YOU "
+        top3 += s"${i+1}) ${currentResult._2._1}: ${formatTime(currentResult._2._3)}\n"
+      }
+
+      if (selfIndex > 3) top3 + s"YOU ${selfIndex+1}) ${temp(selfIndex)._2._1}: ${formatTime(temp(selfIndex)._2._3)}\n" else top3
+    }
+  }
 
   def init(map: String, x0: Int, y0: Int, direction: Float): Unit = {
     _track = new Track(map)
@@ -78,6 +112,7 @@ object Motor {
     initFonts()
 
     initiated = true
+    endGame = false
 
     Server.sendReady(Server.socketUnsafe.get, Server.defaultUUID, isReady = true, Server.MsgType.GameStart).unsafeRunAndForget()
   }
@@ -227,7 +262,6 @@ object Motor {
 
     // 2) Find the index (0-based) of local player in that sorted list
     val selfRankIndex = sortedPlayers.indexWhere(_.uuid == defaultUUID)
-    println(selfRankIndex)
     //   If selfRankIndex == -1, the local player isn't in the map; assume no draw.
 
     // 3) Decide base coordinates and vertical spacing:
