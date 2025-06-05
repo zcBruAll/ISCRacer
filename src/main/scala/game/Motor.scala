@@ -153,12 +153,16 @@ object Motor {
 
     // Gauche Droite
     var vDirection = controller.getAxis(0)
-    if(vDirection > 0.07) inputs.update(p => p.copy(steerRightC = vDirection)).unsafeRunSync()
-    else if(vDirection < -0.07) inputs.update(p => p.copy(steerLeftC = vDirection)).unsafeRunSync()
+    if(vDirection > 0.1f) inputs.update(p => p.copy(steerRightC = 1f)).unsafeRunSync()
+    else if(vDirection < -0.1f) inputs.update(p => p.copy(steerLeftC = -1f)).unsafeRunSync()
+    else {
+      inputs.update(p => p.copy(steerRightC = 0f)).unsafeRunSync()
+      inputs.update(p => p.copy(steerLeftC = 0f)).unsafeRunSync()
+    }
+    println(vDirection)
 
     // Avancer Reculer
     val vForw = controller.getAxis(4)
-    println(s"a/r = $vForw, g/d = $vDirection")
     if(vForw >= 1.0) {
       inputs.update(p => p.copy(forwardC = 0)).unsafeRunSync()
       inputs.update(p => p.copy(backwardC = 0)).unsafeRunSync()
