@@ -22,7 +22,7 @@ object Server {
   var socketUnsafe: Option[Socket[IO]] = None
   var usernameUnsafe: String = "Player " + (100 + math.random() * 100).floor.toInt
   var readyUnsafe = false
-  var lobbyUnsafe: String = "Waiting for lobby data"
+  var lobbyUnsafe: String = "Connect to the server"
   var connected = false
 
   object MsgType {
@@ -95,7 +95,8 @@ object Server {
     }.onFinalize {
       IO {
         socketUnsafe = None
-        lobbyUnsafe = "Waiting for lobby data"
+        lobbyUnsafe = "Connect to the server"
+        readyUnsafe = false
       } >>
       IO.println("[TCP] Connectiong closed with server")
     }
@@ -226,8 +227,17 @@ object Server {
           val usernameBytes = new Array[Byte](usernameLength)
           bb.get(usernameBytes)
           val username = new String(usernameBytes, StandardCharsets.UTF_8)
-          val isReady = bb.get() != 0
-          s"${if (isReady) "READY    " else "NOT READY"} - $username"
+
+          val text = bb.get() match {
+            case 1 =>
+              val laps = bb.getShort
+              s"Lap $laps   " + (if (laps <= 9 && laps >= 0) " " else "")
+            case 0 =>
+              val isReady = bb.get() != 0
+              s"${if (isReady) "READY    " else "NOT READY"}"
+            case _ => "         "
+          }
+          text + s" - $username"
         }
 
         lobbyUnsafe = s"$nbReady/$nbPlayers player${if (nbReady > 1) "s" else ""}\n$timeBeforeStart\n${userlistString.mkString("\n")}"
