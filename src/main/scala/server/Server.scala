@@ -22,7 +22,7 @@ object Server {
   var socketUnsafe: Option[Socket[IO]] = None
   var usernameUnsafe: String = "Player " + (100 + math.random() * 100).floor.toInt
   var readyUnsafe = false
-  var lobbyUnsafe: String = "No lobby"
+  var lobbyUnsafe: String = "Waiting for lobby data"
   var connected = false
 
   object MsgType {
@@ -58,10 +58,16 @@ object Server {
     socket.write(payload).void
   }
 
+  def sendDisconnect(socket: Socket[IO]): IO[Unit] = {
+    socket.endOfInput
+  }
+
   def tcpClient(serverHost: Host, serverPort: Port, uuid: UUID, username: String): Stream[IO, Unit] =
     Stream.resource(Network[IO].client(SocketAddress(serverHost, serverPort))).flatMap { socket =>
-      socketUnsafe = Some(socket)
-      // Send uuid and username to the server
+      Stream.eval(IO {
+        socketUnsafe = Some(socket)
+        lobbyUnsafe = "Connected, sending handshake..."
+      }) ++
       Stream.eval {
         val usernameLength = username.length
         val dataLength = 1 + 16 + 1 + usernameLength
@@ -75,15 +81,23 @@ object Server {
         buf.flip()
         socket.write(Chunk.ByteBuffer(buf))
       } ++
-        Stream.repeatEval {
-          socket.readN(2).map(_.toArray).flatMap { header =>
-            val len = ByteBuffer.wrap(header).order(ByteOrder.BIG_ENDIAN).getShort
-            socket.readN(len).map(_.toArray)
-          }
-        }.evalMap { payload =>
-          decodeTCP(payload)
-          IO.unit
+      Stream.repeatEval {
+        socket.readN(2).map(_.toArray).flatMap { header =>
+          val len = ByteBuffer.wrap(header).order(ByteOrder.BIG_ENDIAN).getShort
+          socket.readN(len).map(_.toArray)
         }
+      }.evalMap { payload =>
+        decodeTCP(payload)
+        IO.unit
+      }.handleErrorWith { err =>
+        Stream.eval(IO.println(s"[TCP] error: ${err.getMessage}"))
+      }
+    }.onFinalize {
+      IO {
+        socketUnsafe = None
+        lobbyUnsafe = "Waiting for lobby data"
+      } >>
+      IO.println("[TCP] Connectiong closed with server")
     }
 
   def udpInputSender(serverHost: IpAddress, serverPort: Port): Stream[IO, Unit] =

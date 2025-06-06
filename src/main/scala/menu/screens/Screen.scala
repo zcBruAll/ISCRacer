@@ -11,13 +11,24 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin
  * Provides utility methods for centering actors within the screen.
  */
 trait Screen {
+  private var stage: Stage = _
+
+  private var addedActors: List[Actor] = List[Actor]()
+
+  def addActor(actor: Actor): Unit = {
+    this.stage.addActor(actor)
+    addedActors ::= actor
+  }
+
   /**
    * Initializes the screen and adds its UI elements to the provided stage.
    *
    * @param stage The Stage used to render UI actors.
    * @param skin The Skin used to style UI widgets.
    */
-  def init(stage: Stage, skin: Skin): Unit
+  def init(stage: Stage, skin: Skin): Unit = {
+    this.stage = stage
+  }
 
   /**
    * Updates the screen's logic.
@@ -29,7 +40,9 @@ trait Screen {
    * Disposes of the screen by clearing or removing any added actors or resources.
    * Called when switching to a different screen.
    */
-  def dispose(): Unit
+  def dispose(): Unit = {
+    stage.clear()
+  }
 
   /**
    * Calculates the X coordinate needed to horizontally center the given actor.

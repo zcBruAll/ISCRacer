@@ -8,8 +8,6 @@ import game.Motor
 import menu.{Lobby, Menu}
 
 class GameScreen extends Screen {
-  private var stage: Stage = _
-
   /**
    * Initializes the screen and adds its UI elements to the provided stage.
    *
@@ -17,7 +15,8 @@ class GameScreen extends Screen {
    * @param skin  The Skin used to style UI widgets.
    */
   override def init(stage: Stage, skin: Skin): Unit = {
-    this.stage = stage
+    super.init(stage, skin)
+
     val settings = Motor.gameSettings
     Motor.init(settings._1, settings._2, settings._3, settings._4)
     Motor.endGame = false
@@ -38,7 +37,7 @@ class GameScreen extends Screen {
    * Called when switching to a different screen.
    */
   override def dispose(): Unit = {
-    stage.clear()
+    super.dispose()
 
     Motor.dispose()
   }

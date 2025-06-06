@@ -8,14 +8,8 @@ import com.badlogic.gdx.scenes.scene2d.{Actor, InputEvent, Stage}
 import menu.{Game, Lobby, MainMenu, Menu, Settings}
 
 class MainMenuScreen extends Screen {
-
-  private var stage: Stage = _
-
   private var btnPlay: TextButton = _
-
   private var btnSettings: TextButton = _
-
-  private var addedActors = List[Actor]()
 
   /**
    * Initializes the screen and adds its UI elements to the provided stage.
@@ -24,7 +18,7 @@ class MainMenuScreen extends Screen {
    * @param skin  The Skin used to style UI widgets.
    */
   override def init(stage: Stage, skin: Skin): Unit = {
-    this.stage = stage
+    super.init(stage, skin)
 
     btnPlay = new TextButton("Play", skin)
     btnSettings = new TextButton("Settings", skin)
@@ -49,12 +43,8 @@ class MainMenuScreen extends Screen {
       }
     })
 
-
-    stage.addActor(btnPlay)
-    stage.addActor(btnSettings)
-
-    addedActors ::= btnPlay
-    addedActors ::= btnSettings
+    addActor(btnPlay)
+    addActor(btnSettings)
   }
 
   /**
@@ -62,12 +52,4 @@ class MainMenuScreen extends Screen {
    * Called once per frame in the main render loop.
    */
   override def update(g: GdxGraphics): Unit = {}
-
-  /**
-   * Disposes of the screen by clearing or removing any added actors or resources.
-   * Called when switching to a different screen.
-   */
-  override def dispose(): Unit = {
-    stage.clear()
-  }
 }

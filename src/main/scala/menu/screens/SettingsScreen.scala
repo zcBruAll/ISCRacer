@@ -7,11 +7,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import menu.{MainMenu, Menu}
 
 class SettingsScreen extends Screen {
-  private var stage: Stage = _
-
   private var btnBack: TextButton = _
-
-  private var addedActors: List[Actor] = List[Actor]()
 
   /**
    * Initializes the screen and adds its UI elements to the provided stage.
@@ -20,11 +16,11 @@ class SettingsScreen extends Screen {
    * @param skin  The Skin used to style UI widgets.
    */
   override def init(stage: Stage, skin: Skin): Unit = {
-    this.stage = stage
+    super.init(stage, skin)
 
     btnBack = new TextButton("Back", skin)
     btnBack.setSize(200, 60)
-    btnBack.setPosition(centerX(btnBack), centerY(btnBack))
+    btnBack.setPosition(20, stage.getHeight - (20 + btnBack.getHeight))
 
     btnBack.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
@@ -32,8 +28,7 @@ class SettingsScreen extends Screen {
       }
     })
 
-    this.stage.addActor(btnBack)
-    addedActors ::= btnBack
+    addActor(btnBack)
   }
 
   /**
@@ -41,12 +36,4 @@ class SettingsScreen extends Screen {
    * Called once per frame in the main render loop.
    */
   override def update(g: GdxGraphics): Unit = {}
-
-  /**
-   * Disposes of the screen by clearing or removing any added actors or resources.
-   * Called when switching to a different screen.
-   */
-  override def dispose(): Unit = {
-    stage.clear()
-  }
 }

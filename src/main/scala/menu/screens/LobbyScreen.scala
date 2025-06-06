@@ -12,16 +12,13 @@ import menu.{Game, MainMenu, Menu}
 import server.Server
 
 class LobbyScreen extends Screen {
-  private var stage: Stage = _
-
   private var lblLobby: Label = _
   private var lblResults: Label = _
   private var txtUsername: TextField = _
   private var btnConnect: TextButton = _
+  private var btnDisconnect: TextButton = _
   private var btnBack: TextButton = _
   private var btnReady: TextButton = _
-
-  private var addedActors: List[Actor] = List[Actor]()
 
   /**
    * Initializes the screen and adds its UI elements to the provided stage.
@@ -30,7 +27,7 @@ class LobbyScreen extends Screen {
    * @param skin  The Skin used to style UI widgets.
    */
   override def init(stage: Stage, skin: Skin): Unit = {
-    this.stage = stage
+    super.init(stage, skin)
 
     val labelStyle = new Label.LabelStyle(Menu.menu.consolasFont, Color.WHITE)
     lblLobby = new Label("", labelStyle)
@@ -55,8 +52,19 @@ class LobbyScreen extends Screen {
     btnConnect.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
         if (!txtUsername.getText.isBlank) {
-          Server.init(txtUsername.getText, "PROD").unsafeRunAndForget()
+          Server.init(txtUsername.getText, "TEST").unsafeRunAndForget()
         }
+      }
+    })
+
+    btnDisconnect = new TextButton("Disconnect", skin)
+    btnDisconnect.setSize(200, 60)
+    btnDisconnect.setPosition(centerX(btnConnect), centerY(btnConnect) - 120)
+
+    btnDisconnect.addListener(new ClickListener {
+      override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
+        if (Server.socketUnsafe.isDefined)
+          Server.sendDisconnect(Server.socketUnsafe.get).unsafeRunAndForget()
       }
     })
 
@@ -82,22 +90,20 @@ class LobbyScreen extends Screen {
 
     btnBack.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
+        if (Server.socketUnsafe.isDefined)
+          Server.sendDisconnect(Server.socketUnsafe.get).unsafeRunAndForget()
         Menu.screenManager.switchTo(MainMenu)
       }
     })
 
-    this.stage.addActor(txtUsername)
-    this.stage.addActor(btnConnect)
-    this.stage.addActor(btnBack)
-    this.stage.addActor(btnReady)
-    this.stage.addActor(lblLobby)
-    this.stage.addActor(lblResults)
-    addedActors ::= txtUsername
-    addedActors ::= btnConnect
-    addedActors ::= btnBack
-    addedActors ::= btnReady
-    addedActors ::= lblLobby
-    addedActors ::= lblResults
+    addActor(txtUsername)
+    addActor(btnConnect)
+    addActor(btnDisconnect)
+    addActor(btnBack)
+    addActor(btnBack)
+    addActor(btnReady)
+    addActor(lblLobby)
+    addActor(lblResults)
 
     Motor.startGame = false
     Motor.initGame = false
@@ -125,17 +131,11 @@ class LobbyScreen extends Screen {
 
     val isSocketDefined = Server.socketUnsafe.isDefined
     btnConnect.setVisible(!isSocketDefined)
+    btnDisconnect.setVisible(isSocketDefined)
+
     btnReady.setVisible(isSocketDefined)
     txtUsername.setDisabled(isSocketDefined)
 
     updateBtnReady()
-  }
-
-  /**
-   * Disposes of the screen by clearing or removing any added actors or resources.
-   * Called when switching to a different screen.
-   */
-  override def dispose(): Unit = {
-    stage.clear()
   }
 }
