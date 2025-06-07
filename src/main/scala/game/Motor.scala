@@ -3,17 +3,18 @@ package game
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import cats.effect.unsafe.implicits.global
+import ch.hevs.gdx2d.components.graphics.Polygon
 import ch.hevs.gdx2d.lib.GdxGraphics
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input.Keys
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.math.Vector3
+import com.badlogic.gdx.math.{Vector2, Vector3}
 import com.badlogic.gdx.utils.Align
 import menu.Menu
 import server.Server
-import server.Server.{PlayerState, defaultUUID}
+import server.Server.{CarState, PlayerState, defaultUUID}
 import utils.Conversion.formatTime
 import utils.{Conversion, GraphicsUtils}
 
@@ -48,6 +49,10 @@ object Motor {
   private var _players: Map[UUID, PlayerState] = Map.empty[UUID, PlayerState]
   def players: Map[UUID, PlayerState] = _players
   def players_=(value: Map[UUID, PlayerState]): Unit = _players = value
+
+  private var _cars: Map[UUID, CarState] = Map.empty[UUID, CarState]
+  def cars: Map[UUID, CarState] = _cars
+  def cars_=(value: Map[UUID, CarState]): Unit = _cars = value
 
   private var debug: Boolean = true
 
@@ -128,7 +133,7 @@ object Motor {
 
     mode7Renderer.render(_camera.x, _camera.y, _camera.angle, _camera.scale, _camera.fov, horizon)
 
-    g.drawTransformedPicture(width / 2, height / 4, 0, 3, _kart.texture)
+    g.drawTransformedPicture(width / 2, height / 4, 0, 2, _kart.texture)
 
     g.drawStringCentered(150, Conversion.longToTimeString(_player.lapTime), lapTimeFont)
     g.drawStringCentered(80, Conversion.longToTimeString(_player.totalTime), totalTimeFont)
@@ -137,6 +142,7 @@ object Motor {
     if (debug) displayDebug(g)
     displayLeaderboard(g)
     GraphicsUtils.drawFPS(g, Color.WHITE, 5f, height - 10)
+    displayMinimap(g)
   }
 
   private def initKart(x0: Int, y0: Int, direction: Float): Unit = {
@@ -311,6 +317,49 @@ object Motor {
         g.drawString(xPos, yStart - 6 * ySpacing, textBelow, totalTimeFont, Align.right)
       }
     }
+  }
+
+  def displayMinimap(g: GdxGraphics): Unit = {
+    val size = 250f
+    val mapImg = _track.minimapTexture
+    val scale = size / mapImg.getImage.getWidth
+
+    val posX = width - size / 2 - 20
+    val posY = height - size / 2 - 20
+
+    g.drawTransformedPicture(posX, posY, 0, scale, mapImg)
+
+    val relX = posX - size / 2 + (_kart.x / _track.mapTexture.getWidth) * size
+    val relY = posY - size / 2 + (size - (_kart.y / _track.mapTexture.getHeight) * size)
+
+    val cosA = math.cos(_kart.angle).toFloat
+    val sinA = math.sin(_kart.angle).toFloat
+
+    // Triangle pointing right
+    val pts = Array(
+      new Vector2(6, 0),
+      new Vector2(-3, 3),
+      new Vector2(-3, -3),
+    )
+
+    // Rotation by kart.angle + π
+    val rotated = pts.map { p =>
+      new Vector2(
+        relX + p.x * cosA - p.y * sinA,
+        relY - p.x * sinA - p.y * cosA
+      )
+    }
+
+    cars.foreach { case(id, car) =>
+      if (id != defaultUUID) {
+        val px = posX - size / 2 + (car.x / _track.mapTexture.getWidth) * size
+        val py = posY - size / 2 + (size - (car.y / _track.mapTexture.getHeight) * size)
+        println("Drawing other player")
+        g.drawFilledCircle(px, py, 3, Color.WHITE)
+      }
+    }
+
+    g.drawFilledPolygon(new Polygon(rotated), Color.ORANGE)
   }
 
   /**

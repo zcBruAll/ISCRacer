@@ -1,5 +1,6 @@
 package game
 
+import ch.hevs.gdx2d.components.bitmaps.BitmapImage
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.math.Vector2
@@ -11,6 +12,7 @@ class Track(val name: String) {
   val checkpoints: List[Checkpoint] = loadCheckpoints(baseTrackDir + "points.json")
 
   val mapTexture = new Texture(Gdx.files.internal(baseTrackDir + "texture.png"))
+  val minimapTexture = new BitmapImage(baseTrackDir + "minimap.png")
 
   val segmentLengths: Array[Float] = checkpoints
       .sliding(2)
@@ -71,5 +73,6 @@ class Track(val name: String) {
 
   def dispose(): Unit = {
     mapTexture.dispose()
+    minimapTexture.dispose()
   }
 }

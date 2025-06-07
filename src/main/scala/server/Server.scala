@@ -107,8 +107,8 @@ object Server {
 
       socket.reads.evalMap { datagram =>
         datagram.bytes.toArray.head match {
-          case MsgType.CarState => val
-            carStates = decodeCarState(datagram.bytes.toArray.tail)
+          case MsgType.CarState =>
+            val carStates = decodeCarState(datagram.bytes.toArray.tail)
             val personalCarState = carStates.getOrElse(Array.empty[CarState]).find(_.uuid.equals(defaultUUID))
             if (personalCarState.isDefined && Motor.kart != null) {
               val car = personalCarState.get
@@ -118,6 +118,7 @@ object Server {
               Motor.kart.speedY = car.vy
               Motor.kart.angle = car.direction
             }
+            Motor.cars = carStates.getOrElse(Array.empty[CarState]).map(c => c.uuid -> c).toMap
             IO.unit//IO.println(s"[UDP] Car update received: ${carStates.getOrElse(Array.empty[CarState]).mkString(", ")}")
           case MsgType.PlayerState =>
             val playerStates = decodePlayerState(datagram.bytes.toArray.tail).getOrElse(Array.empty[PlayerState]).map(e => e.uuid -> e).toMap
