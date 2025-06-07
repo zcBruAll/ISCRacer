@@ -15,13 +15,13 @@ class Kart {
   def x: Float = _x
 
   def x_= (value: Float): Unit = {
-    _x = if (value < 0) 4096 + value else value % 4096
+    _x = value
   }
 
   def y: Float = _y
 
   def y_= (value: Float): Unit = {
-    _y = if (value < 0) 4096 + value else value % 4096
+    _y = value
   }
 
   def angle: Float = _angle

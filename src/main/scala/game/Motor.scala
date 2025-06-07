@@ -251,14 +251,11 @@ object Motor {
     g.drawString(10, 60, "SegDist: " + _player.segmentDist)
     g.drawString(10, 80, "TotDist: " + _player.lapsDist)
 
-    g.drawString(10, 220, "Speed: " + _kart.speedX.toString)
+    g.drawString(10, 200, "SpeedX: " + _kart.speedX.toString)
+    g.drawString(10, 220, "SpeedY: " + _kart.speedY.toString)
     g.drawString(10, 240, "X: " + _kart.x.toString)
     g.drawString(10, 260, "Y: " + _kart.y.toString)
     g.drawString(10, 280, "Angle: " + _kart.angle.toString)
-
-    g.drawString(10, 320, "X: " + _camera.x.toString)
-    g.drawString(10, 340, "Y: " + _camera.y.toString)
-    g.drawString(10, 360, "Angle: " + _camera.angle.toString)
 
     g.drawString(10, 400, "Best Lap: " + Conversion.longToTimeString(_player.bestLap))
     g.drawString(10, 420, "Last Lap: " + Conversion.longToTimeString(_player.lastLap))
