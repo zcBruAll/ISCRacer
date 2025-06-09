@@ -52,7 +52,7 @@ class LobbyScreen extends Screen {
     btnConnect.addListener(new ClickListener {
       override def clicked(event: InputEvent, x: Float, y: Float): Unit = {
         if (!txtUsername.getText.isBlank) {
-          Server.init(txtUsername.getText, "TEST").unsafeRunAndForget()
+          Server.init(txtUsername.getText, "PROD").unsafeRunAndForget()
         }
       }
     })

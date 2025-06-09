@@ -10,23 +10,19 @@ import com.badlogic.gdx.Input.Keys
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.math.{Vector2, Vector3}
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.utils.Align
 import menu.Menu
 import server.Server
 import server.Server.{CarState, PlayerState, defaultUUID}
 import utils.Conversion.formatTime
 import utils.{Conversion, GraphicsUtils}
+import com.badlogic.gdx.controllers.Controller
 
 import java.util.UUID
 
 case class PlayerInput(forwardKB: Float = 0, backwardKB: Float = 0, steerLeftKB: Float = 0, steerRightKB: Float = 0, driftKB: Boolean = false,
                        forwardC: Float = 0, backwardC: Float = 0, steerLeftC: Float = 0, steerRightC: Float = 0, driftC: Boolean = false)
-import utils.GraphicsUtils
-import com.badlogic.gdx.controllers.Controller
-import com.badlogic.gdx.scenes.scene2d.ui.Slider
-
-import javax.naming.ldap.Control
 
 object Motor {
   val inputs: Ref[IO, PlayerInput] = Ref.of[IO, PlayerInput](PlayerInput()).unsafeRunSync()
@@ -133,6 +129,8 @@ object Motor {
 
     mode7Renderer.render(_camera.x, _camera.y, _camera.angle, _camera.scale, _camera.fov, horizon)
 
+    displayRemoteCars(g)
+
     g.drawTransformedPicture(width / 2, height / 4, 0, 2, _kart.texture)
 
     g.drawStringCentered(150, Conversion.longToTimeString(_player.lapTime), lapTimeFont)
@@ -156,18 +154,18 @@ object Motor {
   def onControllerDisconnected(controller: Controller){}
 
   def onControllerAxisMoved(controller: Controller, axisCode: Int, value: Float): Unit = {
+    if (!initiated) return
 
-    // Gauche Droite
-    var vDirection = controller.getAxis(0)
-    if(vDirection > 0.1f) inputs.update(p => p.copy(steerRightC = 1f)).unsafeRunSync()
-    else if(vDirection < -0.1f) inputs.update(p => p.copy(steerLeftC = -1f)).unsafeRunSync()
+    // Left - Right
+    val vDirection = controller.getAxis(0)
+    if (vDirection > 0.1f) inputs.update(p => p.copy(steerRightC = 1f)).unsafeRunSync()
+    else if (vDirection < -0.1f) inputs.update(p => p.copy(steerLeftC = -1f)).unsafeRunSync()
     else {
       inputs.update(p => p.copy(steerRightC = 0f)).unsafeRunSync()
       inputs.update(p => p.copy(steerLeftC = 0f)).unsafeRunSync()
     }
-    println(vDirection)
 
-    // Avancer Reculer
+    // Forward - Backward
     val vForw = controller.getAxis(4)
     if(vForw >= 1.0) {
       inputs.update(p => p.copy(forwardC = 0)).unsafeRunSync()
@@ -182,16 +180,18 @@ object Motor {
   }
 
   def onControllerKeyDown(controller: Controller, buttonCode: Int): Unit = {
-    buttonCode match{
+    if (!initiated) return
+    buttonCode match {
       case 0 => inputs.update(p => p.copy(driftKB = true)).unsafeRunSync()
       case 4 => inputs.update(p => p.copy(driftKB = true)).unsafeRunSync()
       case _ =>
-      // 0 et 4 por drifter (l1 et A)
-      }
+      // 0, 4 to drift (L1 and A)
+    }
   }
 
   def onControllerKeyUp(controller: Controller, buttonCode: Int): Unit = {
-    buttonCode match{
+    if (!initiated) return
+    buttonCode match {
       case 0 => inputs.update(p => p.copy(driftKB = false)).unsafeRunSync()
       case 4 => inputs.update(p => p.copy(driftKB = false)).unsafeRunSync()
       case _ =>
@@ -233,10 +233,10 @@ object Motor {
     totalTimeFont = generator.generateFont(paramTotalTime)
 
     val paramPersonalTime = new FreeTypeFontGenerator.FreeTypeFontParameter
-    paramTotalTime.color = Color.LIME
-    paramTotalTime.size = generator.scaleForPixelHeight(36)
-    paramTotalTime.hinting = FreeTypeFontGenerator.Hinting.Full
-    personalTimeFont = generator.generateFont(paramTotalTime)
+    paramPersonalTime.color = Color.LIME
+    paramPersonalTime.size = generator.scaleForPixelHeight(36)
+    paramPersonalTime.hinting = FreeTypeFontGenerator.Hinting.Full
+    personalTimeFont = generator.generateFont(paramPersonalTime)
 
     val paramLapTime = new FreeTypeFontGenerator.FreeTypeFontParameter
     paramLapTime.color = Color.WHITE
@@ -316,6 +316,36 @@ object Motor {
     }
   }
 
+  def displayRemoteCars(g: GdxGraphics): Unit = {
+    val cosA = math.cos(_camera.angle)
+    val sinA = math.sin(_camera.angle)
+
+    // maximum render distance of car
+    val renderDist = 1400
+
+    cars.foreach { case (id, car) =>
+      if (id != defaultUUID) {
+        val dx = car.x - _camera.x
+        val dy = car.y - _camera.y
+
+        val localX = dx * cosA + dy * sinA      // forward distance
+        val localY = -dx * sinA + dy * cosA     // right/left offset
+
+        // If negative, car isn't in front of the camera
+        if (localX > 0) {
+          val screenHeight = height - horizon
+          val row = _camera.scale / localX
+          val y = screenHeight - row * height
+
+          val offset = localY / localX
+          val x = width / 2 + offset / _camera.fov * (width / 2)
+
+          g.drawFilledCircle(x.toFloat, y.toFloat, (20 * math.max(0, renderDist - localX) / renderDist).toFloat, Color.RED)
+        }
+      }
+    }
+  }
+
   def displayMinimap(g: GdxGraphics): Unit = {
     val size = 250f
     val mapImg = _track.minimapTexture
@@ -340,10 +370,17 @@ object Motor {
     )
 
     // Rotation by kart.angle + π
-    val rotated = pts.map { p =>
+    val rotatedIn = pts.map { p =>
       new Vector2(
-        relX + p.x * cosA - p.y * sinA,
-        relY - p.x * sinA - p.y * cosA
+        relX + 3 * p.x * cosA - 3 * p.y * sinA,
+        relY - 3 * p.x * sinA - 3 * p.y * cosA
+      )
+    }
+
+    val rotatedOut = pts.map { p =>
+      new Vector2(
+        relX + 3.4f * p.x * cosA - 3.4f * p.y * sinA,
+        relY - 3.4f * p.x * sinA - 3.4f * p.y * cosA
       )
     }
 
@@ -351,12 +388,21 @@ object Motor {
       if (id != defaultUUID) {
         val px = posX - size / 2 + (car.x / _track.mapTexture.getWidth) * size
         val py = posY - size / 2 + (size - (car.y / _track.mapTexture.getHeight) * size)
-        println("Drawing other player")
-        g.drawFilledCircle(px, py, 3, Color.WHITE)
+        val cosD = math.cos(car.direction).toFloat
+        val sinD = math.sin(car.direction).toFloat
+        // Rotation by kart.angle + π
+        val rotatedCars = pts.map { p =>
+          new Vector2(
+            px + p.x * cosD - p.y * sinD,
+            py - p.x * sinD - p.y * cosD
+          )
+        }
+        g.drawFilledPolygon(new Polygon(rotatedCars), Color.WHITE)
       }
     }
 
-    g.drawFilledPolygon(new Polygon(rotated), Color.ORANGE)
+    g.drawFilledPolygon(new Polygon(rotatedOut), Color.BLACK)
+    g.drawFilledPolygon(new Polygon(rotatedIn), Color.LIME)
   }
 
   /**
