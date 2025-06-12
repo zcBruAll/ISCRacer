@@ -77,5 +77,10 @@ A more detailed derivation of this projection can be found in [`src/main/assets/
 
 `Server.scala` manages TCP and UDP communication with the game server using **fs2** streams. It handles handshake, lobby state, real‑time car updates and player inputs. The client can be started with `Server.init(username)` which spawns the networking streams.
 
+By default, the clients connect to an online server, you can locally host the server from [its repository](https://github.com/zcBruAll/ISCRacer-Server) and update the _line 55_ of [src/main/scala/menu/screens/LobbyScreen.scala](https://github.com/zcBruAll/ISCRacer/blob/master/src/main/scala/menu/screens/LobbyScreen.scala) to use the `TEST` (localhost) environment:
+```scala
+Server.init(txtUsername.getText, "TEST").unsafeRunAndForget() // Will run the localhost configuration
+```
+
 ---
 Feel free to explore the source for more details or tweak the assets under `src/main/assets` to create new tracks or karts.
